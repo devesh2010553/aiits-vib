@@ -426,7 +426,19 @@ function showPage(id){document.querySelectorAll('.page').forEach(function(p){p.c
 function esc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function gv(id){var el=document.getElementById(id);return el?(el.value||'').trim():'';}
 function setEl(id,v){var el=document.getElementById(id);if(el)el.textContent=v;}
-function togglePw(id,btn){var el=document.getElementById(id);if(!el)return;var show=el.type==='password';el.type=show?'text':'password';btn.innerHTML=show?'<i class="fas fa-eye-slash"></i>':'<i class="fas fa-eye"></i>';}
+function togglePw(id, btn) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  if (el.type === 'password') {
+    el.type = 'text';
+    var i = btn.querySelector('i');
+    if (i) i.className = 'fas fa-eye-slash';
+  } else {
+    el.type = 'password';
+    var i2 = btn.querySelector('i');
+    if (i2) i2.className = 'fas fa-eye';
+  }
+}
 function toast(msg,type,dur){
   type=type||'info';dur=dur||3500;
   var c=document.getElementById('toast-container');if(!c)return;
@@ -444,12 +456,19 @@ function api(url,opts){
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────
-window.addEventListener('load',function(){
-  api('/api/auth/admin-me').then(function(r){
-    if(r&&r.admin){showPage('page-admin');initAdmin();}
-    else showPage('page-login');
-  }).catch(function(){showPage('page-login');});
-  setTimeout(function(){try{if(typeof io!=='undefined'){socket=io({withCredentials:true});}}catch(e){}},800);
+window.addEventListener('load', function() {
+  // Show login page IMMEDIATELY — never wait for API
+  showPage('page-login');
+
+  // Check if already logged in (background, non-blocking)
+  api('/api/auth/admin-me').then(function(r) {
+    if (r && r.admin) { showPage('page-admin'); initAdmin(); }
+    // else stay on login — already shown
+  }).catch(function() { /* stay on login */ });
+
+  setTimeout(function() {
+    try { if (typeof io !== 'undefined') socket = io({ withCredentials: true }); } catch(e) {}
+  }, 1000);
 });
 
 // ── LOGIN / LOGOUT ────────────────────────────────────────────────────────

@@ -49,7 +49,7 @@ textarea{resize:vertical}
 .btn-full{width:100%;justify-content:center}
 .btn-link{background:none;border:none;color:var(--gold);cursor:pointer;font-size:14px;font-family:var(--font);padding:0}
 /* LOADING */
-.loading-screen{position:fixed;inset:0;background:#fff;z-index:9999;display:flex;align-items:center;justify-content:center;transition:opacity 0.4s}
+.loading-screen{position:fixed;inset:0;background:#fff;z-index:9999;display:flex;align-items:center;justify-content:center;transition:opacity 0.4s;pointer-events:none}
 .loading-screen.fade-out{opacity:0;pointer-events:none}
 .loader-ring{position:absolute;inset:-10px;border-radius:50%;border:3px solid transparent;border-top-color:var(--gold);border-right-color:var(--gold-light);animation:spin 1s linear infinite}
 .loader-logo-wrap{position:relative;display:inline-block;margin-bottom:24px}
@@ -812,37 +812,38 @@ function scrollToSection(id) {
 
 // ── INIT ─────────────────────────────────────────────────────────────
 window.addEventListener('load', function() {
-  // 1. Show home page IMMEDIATELY — never block on auth
+  // Show home immediately — buttons work at once
   showPage('page-home');
 
-  // 2. Hide loading screen right away (300ms just for animation)
-  var ls = document.getElementById('loading-screen');
-  if (ls) {
-    ls.style.pointerEvents = 'none'; // allow clicks even before hidden
-    setTimeout(function() {
-      ls.classList.add('fade-out');
-      setTimeout(function() { ls.style.display = 'none'; }, 450);
-    }, 300);
-  }
+  // Hide loader after short animation (pointer-events:none in CSS so it never blocks)
+  setTimeout(function() {
+    var ls = document.getElementById('loading-screen');
+    if (ls) {
+      ls.style.opacity = '0';
+      setTimeout(function() { if (ls) ls.style.display = 'none'; }, 420);
+    }
+  }, 350);
 
-  // 3. Load home content immediately (no auth needed)
+  // Load public home content (no auth needed)
   loadHomeStats();
   loadHomeGallery();
 
-  // 4. Check auth in background — if logged in, switch to dashboard
+  // Check if student already logged in — background, never blocks page
   checkAuth();
 
-  // 5. Handle ?resume=testId returning from ad page
+  // Resume param from ad page redirect
   var resumeId = new URLSearchParams(window.location.search).get('resume');
-  if (resumeId) window._pendingResume = resumeId;
+  if (resumeId) { window._pendingResume = resumeId; }
 
-  // 6. Socket.io — non-blocking
+  // Socket.io — non-blocking
   setTimeout(function() {
     try { if (typeof io !== 'undefined') socket = io({ withCredentials: true }); } catch(e) {}
-  }, 1000);
+  }, 1500);
 
-  // 7. Service worker
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});
+  // Service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(function() {});
+  }
 });
 
 // ── API ───────────────────────────────────────────────────────────────
@@ -877,11 +878,18 @@ function esc(s){ if(s==null)return ''; return String(s).replace(/&/g,'&amp;').re
 function gv(id){ var el=document.getElementById(id); return el?(el.value||'').trim():''; }
 function setEl(id,v){ var el=document.getElementById(id); if(el)el.textContent=v; }
 function closeModal(id){ var el=document.getElementById(id); if(el)el.classList.add('hidden'); }
-function togglePw(id,btn){
-  var el=document.getElementById(id); if(!el)return;
-  var show=el.type==='password';
-  el.type=show?'text':'password';
-  btn.innerHTML=show?'<i class="fas fa-eye-slash"></i>':'<i class="fas fa-eye"></i>';
+function togglePw(id, btn) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  if (el.type === 'password') {
+    el.type = 'text';
+    var i = btn.querySelector('i');
+    if (i) i.className = 'fas fa-eye-slash';
+  } else {
+    el.type = 'password';
+    var i2 = btn.querySelector('i');
+    if (i2) i2.className = 'fas fa-eye';
+  }
 }
 
 // ── AUTH CHECK ────────────────────────────────────────────────────────
