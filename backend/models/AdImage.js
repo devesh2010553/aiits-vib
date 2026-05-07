@@ -1,0 +1,9 @@
+const mongoose = require('mongoose');
+const adImageSchema = new mongoose.Schema({
+  title:       { type: String, trim: true, default: '' },
+  imageData:   { type: String, required: true },
+  redirectUrl: { type: String, default: '' },
+  showOnHome:  { type: Boolean, default: true },
+  description: { type: String, default: '' }
+}, { timestamps: true });
+module.exports = mongoose.model('AdImage', adImageSchema);
