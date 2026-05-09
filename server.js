@@ -1,12 +1,11 @@
 require('dotenv').config();
 
-// ── Validate required env vars ───────────────────────────────────────
-const REQUIRED = ['MONGODB_URI', 'ADMIN_EMAIL', 'ADMIN_PASSWORD'];
+const REQUIRED = ['MONGODB_URI','ADMIN_EMAIL','ADMIN_PASSWORD'];
 const missing  = REQUIRED.filter(k => !process.env[k]);
 if (missing.length) { console.error('[STARTUP] Missing env vars:', missing.join(', ')); process.exit(1); }
 if (!process.env.JWT_SECRET) {
   process.env.JWT_SECRET = require('crypto').randomBytes(64).toString('hex');
-  console.warn('[STARTUP] JWT_SECRET not set — using random key. Add to Render env vars!');
+  console.warn('[STARTUP] JWT_SECRET not set — add to Render env vars!');
 }
 
 const express      = require('express');
@@ -23,20 +22,33 @@ const server = http.createServer(app);
 const io     = new Server(server, { cors: { origin: process.env.CLIENT_URL || '*', credentials: true } });
 app.set('io', io);
 
-// ── Security headers (CSP allows inline scripts for single-file HTML + AdSense) ──
+// ── Security + CSP ────────────────────────────────────────────────────
 app.use((req, res, next) => {
-  res.setHeader('X-Content-Type-Options',  'nosniff');
-  res.setHeader('X-Frame-Options',         'SAMEORIGIN');
-  res.setHeader('X-XSS-Protection',        '1; mode=block');
-  res.setHeader('Referrer-Policy',         'strict-origin-when-cross-origin');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options',        'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection',       '1; mode=block');
   res.setHeader('Content-Security-Policy', [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://pagead2.googlesyndication.com https://partner.googleadservices.com https://tpc.googlesyndication.com https://adservice.google.com",
+    // Inline scripts needed for single-file HTML + AdSense needs unsafe-inline
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' " +
+      "https://cdnjs.cloudflare.com " +
+      "https://pagead2.googlesyndication.com " +
+      "https://partner.googleadservices.com " +
+      "https://tpc.googlesyndication.com " +
+      "https://adservice.google.com " +
+      "https://ep1.adtrafficquality.google " +
+      "https://ep2.adtrafficquality.google " +
+      "https://securepubads.g.doubleclick.net " +
+      "https://www.googletagservices.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
-    "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:",
-    "img-src 'self' data: https: blob:",
+    "font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com",
+    "img-src 'self' data: blob: https:",
     "connect-src 'self' wss: ws: https:",
-    "frame-src 'self' https://googleads.g.doubleclick.net https://tpc.googlesyndication.com",
+    // AdSense needs frames
+    "frame-src 'self' " +
+      "https://googleads.g.doubleclick.net " +
+      "https://tpc.googlesyndication.com " +
+      "https://www.google.com",
     "worker-src 'self'"
   ].join('; '));
   next();
@@ -47,17 +59,17 @@ app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use(cookieParser());
 
-// ── Rate limits ───────────────────────────────────────────────────────
-app.use('/api/',                       rateLimit({ windowMs: 15 * 60 * 1000, max: 600,  message: { error: 'Too many requests. Try again later.' } }));
-app.use('/api/auth/forgot-password',   rateLimit({ windowMs: 10 * 60 * 1000, max: 5,   message: { error: 'Too many OTP requests. Try again in 10 minutes.' } }));
-app.use('/api/auth/login',             rateLimit({ windowMs:  5 * 60 * 1000, max: 20,  message: { error: 'Too many login attempts. Try again in 5 minutes.' } }));
-app.use('/api/auth/register',          rateLimit({ windowMs: 60 * 60 * 1000, max: 10,  message: { error: 'Too many registrations from this IP.' } }));
+// Rate limits
+app.use('/api/',                     rateLimit({ windowMs: 15*60*1000, max: 600 }));
+app.use('/api/auth/forgot-password', rateLimit({ windowMs: 10*60*1000, max: 5   }));
+app.use('/api/auth/login',           rateLimit({ windowMs:  5*60*1000, max: 20  }));
+app.use('/api/auth/register',        rateLimit({ windowMs: 60*60*1000, max: 10  }));
 
-// ── Static files ──────────────────────────────────────────────────────
+// Static files
 app.use(express.static(path.join(__dirname, 'frontend'), {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('sw.js')) {
-      res.setHeader('Cache-Control',        'no-cache');
+      res.setHeader('Cache-Control',          'no-cache');
       res.setHeader('Service-Worker-Allowed', '/');
     }
     if (filePath.endsWith('.html')) {
@@ -66,7 +78,7 @@ app.use(express.static(path.join(__dirname, 'frontend'), {
   }
 }));
 
-// ── Utility / SEO ─────────────────────────────────────────────────────
+// Utility
 app.get('/ping',   (_, res) => res.status(200).json({ status: 'ok', ts: Date.now() }));
 app.get('/health', (_, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
@@ -82,17 +94,13 @@ app.get('/sitemap.xml', (_, res) => {
   res.send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${base}/</loc><lastmod>${d}</lastmod><priority>1.0</priority></url><url><loc>${base}/register</loc><priority>0.8</priority></url><url><loc>${base}/login</loc><priority>0.7</priority></url></urlset>`);
 });
 
-// ── Secret admin page — no .html in URL ──────────────────────────────
-app.get('/adminvibacdonlineaiits', (_, res) => {
-  res.sendFile(path.join(__dirname, 'frontend', 'adminvibacdonlineaiits.html'));
-});
+// Secret pages — no .html in URL
+app.get('/adminvibacdonlineaiits', (_, res) =>
+  res.sendFile(path.join(__dirname, 'frontend', 'adminvibacdonlineaiits.html')));
+app.get('/ad856eyqafggg', (_, res) =>
+  res.sendFile(path.join(__dirname, 'frontend', 'ad856eyqafggg.html')));
 
-// ── Ad manager page ───────────────────────────────────────────────────
-app.get('/ad856eyqafggg', (_, res) => {
-  res.sendFile(path.join(__dirname, 'frontend', 'ad856eyqafggg.html'));
-});
-
-// ── API routes ────────────────────────────────────────────────────────
+// API
 app.use('/api/auth',     require('./backend/routes/auth'));
 app.use('/api/admin',    require('./backend/routes/admin'));
 app.use('/api/tests',    require('./backend/routes/tests'));
@@ -100,44 +108,34 @@ app.use('/api/results',  require('./backend/routes/results'));
 app.use('/api/rankings', require('./backend/routes/rankings'));
 app.use('/api/push',     require('./backend/routes/push'));
 
-// ── Public gallery images (no auth) ──────────────────────────────────
+// Public gallery (no auth)
 app.get('/api/public/ad-images', async (req, res) => {
   try {
     const AdImage = require('./backend/models/AdImage');
     const images  = await AdImage.find({ showOnHome: true })
-      .select('imageData title redirectUrl description')
-      .sort({ createdAt: -1 });
+      .select('imageData title redirectUrl description').sort({ createdAt: -1 });
     res.json(images);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ── SPA fallback ──────────────────────────────────────────────────────
+// SPA fallback
 app.get('*', (req, res) => {
-  const ext = path.extname(req.path);
-  if (ext && ext !== '.html') return res.status(404).json({ error: 'Not found' });
+  if (path.extname(req.path) && path.extname(req.path) !== '.html')
+    return res.status(404).json({ error: 'Not found' });
   res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
 });
 
-// ── Socket.IO ─────────────────────────────────────────────────────────
+// Socket.IO
 io.on('connection', socket => {
   socket.on('join-test',  id => socket.join('test-' + id));
   socket.on('leave-test', id => socket.leave('test-' + id));
   socket.on('join-admin', ()  => socket.join('admin-room'));
-  socket.on('disconnect', ()  => { /* handled automatically */ });
 });
 
-// ── Start server + MongoDB ────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log('[SERVER] AIITS running on port', PORT);
-  console.log('[SERVER] Admin panel: /adminvibacdonlineaiits');
-  console.log('[SERVER] Ad manager:  /ad856eyqafggg');
-});
+server.listen(PORT, '0.0.0.0', () => console.log('[SERVER] AIITS on port', PORT));
 
-mongoose.connect(process.env.MONGODB_URI, {
-  serverSelectionTimeoutMS: 15000,
-  socketTimeoutMS: 45000
-})
+mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 15000 })
   .then(() => console.log('[DB] MongoDB connected'))
   .catch(err => console.error('[DB] MongoDB error:', err.message));
 

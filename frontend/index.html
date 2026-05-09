@@ -786,147 +786,79 @@ textarea{resize:vertical}
 </div>
 
 <script>
-var S = {
-  user: null, isAdmin: false, currentTest: null,
-  answers: {},        // { qIdx: optionIdx } for single, { qIdx: [opts] } for multi
-  qIdx: 0, startTime: null, timerIv: null,
-  timerTotal: 0, timerLeft: 0,
-  pendingTestId: null, pendingTestData: null,
-  allStudents: [], qCounter: 0, resultData: null,
-  violations: 0, saveIv: null, currentTestId: null
-};
-var socket = null;
-var deferredInstallPrompt = null;
+var S={user:null,isAdmin:false,currentTest:null,answers:{},qIdx:0,startTime:null,timerIv:null,timerTotal:0,timerLeft:0,pendingTestId:null,pendingTestData:null,allStudents:[],qCounter:0,resultData:null,violations:0,saveIv:null,currentTestId:null};
+var socket=null;
 
-// ── PAGE NAV ─────────────────────────────────────────────────────────
-function showPage(id) {
-  var pages = document.querySelectorAll('.page');
-  for (var i = 0; i < pages.length; i++) pages[i].classList.remove('active');
-  var el = document.getElementById(id);
-  if (el) { el.classList.add('active'); window.scrollTo(0,0); }
-}
-function scrollToSection(id) {
-  var el = document.getElementById(id);
-  if (el) el.scrollIntoView({ behavior:'smooth' });
-}
+function showPage(id){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});var el=document.getElementById(id);if(el){el.classList.add('active');window.scrollTo(0,0);}}
+function scrollToSection(id){var el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth'});}
 
-// ── INIT ─────────────────────────────────────────────────────────────
-window.addEventListener('load', function() {
-  // Show home immediately — buttons work at once
+window.addEventListener('load',function(){
   showPage('page-home');
-
-  // Hide loader after short animation (pointer-events:none in CSS so it never blocks)
-  setTimeout(function() {
-    var ls = document.getElementById('loading-screen');
-    if (ls) {
-      ls.style.opacity = '0';
-      setTimeout(function() { if (ls) ls.style.display = 'none'; }, 420);
-    }
-  }, 350);
-
-  // Load public home content (no auth needed)
+  var ls=document.getElementById('loading-screen');
+  if(ls){ls.style.pointerEvents='none';setTimeout(function(){ls.style.opacity='0';ls.style.transition='opacity 0.4s';setTimeout(function(){ls.style.display='none';},420);},300);}
   loadHomeStats();
   loadHomeGallery();
-
-  // Check if student already logged in — background, never blocks page
   checkAuth();
-
-  // Resume param from ad page redirect
-  var resumeId = new URLSearchParams(window.location.search).get('resume');
-  if (resumeId) { window._pendingResume = resumeId; }
-
-  // Socket.io — non-blocking
-  setTimeout(function() {
-    try { if (typeof io !== 'undefined') socket = io({ withCredentials: true }); } catch(e) {}
-  }, 1500);
-
-  // Service worker
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(function() {});
-  }
+  var resumeId=new URLSearchParams(window.location.search).get('resume');
+  if(resumeId)window._pendingResume=resumeId;
+  setTimeout(function(){try{if(typeof io!=='undefined')socket=io({withCredentials:true});}catch(e){}},1500);
+  if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(function(){});
 });
 
-// ── API ───────────────────────────────────────────────────────────────
-function api(url, opts) {
-  opts = opts || {};
-  return fetch(url, {
-    credentials: 'include',
-    headers: Object.assign({'Content-Type':'application/json'}, opts.headers||{}),
-    method: opts.method||'GET',
-    body: opts.body||undefined
-  }).then(function(res) {
-    return res.json().then(function(data) {
-      if (!res.ok) throw new Error(data.error || ('HTTP '+res.status));
-      return data;
-    });
-  });
+function api(url,opts){
+  opts=opts||{};
+  return fetch(url,{credentials:'include',headers:Object.assign({'Content-Type':'application/json'},opts.headers||{}),method:opts.method||'GET',body:opts.body||undefined}).then(function(res){return res.json().then(function(data){if(!res.ok)throw new Error(data.error||('HTTP '+res.status));return data;});});
 }
 
-// ── TOAST ─────────────────────────────────────────────────────────────
-function toast(msg, type, dur) {
-  type=type||'info'; dur=dur||3500;
-  var c = document.getElementById('toast-container'); if(!c) return;
-  var icons = {success:'fa-check-circle',error:'fa-exclamation-circle',info:'fa-info-circle'};
-  var t = document.createElement('div');
-  t.className='toast '+type;
-  t.innerHTML='<i class="fas '+(icons[type]||icons.info)+'" style="color:inherit"></i><span>'+msg+'</span>';
+function toast(msg,type,dur){
+  type=type||'info';dur=dur||3500;
+  var c=document.getElementById('toast-container');if(!c)return;
+  var icons={success:'fa-check-circle',error:'fa-exclamation-circle',info:'fa-info-circle'};
+  var t=document.createElement('div');t.className='toast '+type;
+  t.innerHTML='<i class="fas '+(icons[type]||icons.info)+'"></i><span>'+esc(msg)+'</span>';
   c.appendChild(t);
   setTimeout(function(){t.style.opacity='0';t.style.transform='translateX(110%)';t.style.transition='0.3s';setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},300);},dur);
 }
-function escHtml(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
-function esc(s){ if(s==null)return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function gv(id){ var el=document.getElementById(id); return el?(el.value||'').trim():''; }
-function setEl(id,v){ var el=document.getElementById(id); if(el)el.textContent=v; }
-function closeModal(id){ var el=document.getElementById(id); if(el)el.classList.add('hidden'); }
-function togglePw(id, btn) {
-  var el = document.getElementById(id);
-  if (!el) return;
-  if (el.type === 'password') {
-    el.type = 'text';
-    var i = btn.querySelector('i');
-    if (i) i.className = 'fas fa-eye-slash';
-  } else {
-    el.type = 'password';
-    var i2 = btn.querySelector('i');
-    if (i2) i2.className = 'fas fa-eye';
-  }
+function esc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function gv(id){var el=document.getElementById(id);return el?(el.value||'').trim():'';}
+function setEl(id,v){var el=document.getElementById(id);if(el)el.textContent=v;}
+function closeModal(id){var el=document.getElementById(id);if(el)el.classList.add('hidden');}
+function togglePw(id,btn){
+  var el=document.getElementById(id);if(!el)return;
+  var showing=(el.type==='text');
+  el.type=showing?'password':'text';
+  var icon=btn.querySelector('i');
+  if(icon)icon.className=showing?'fas fa-eye':'fas fa-eye-slash';
 }
 
-// ── AUTH CHECK ────────────────────────────────────────────────────────
-function checkAuth() {
-  // Only check student session — admin uses separate page /adminvibacdonlineaiits
-  var path = window.location.pathname;
-  checkStudentSession(path);
-}
-function checkStudentSession(path) {
-  api('/api/auth/me').then(function(r) {
-    if (r && r.user) {
-      S.user=r.user; updateNavUser(); showPage('page-dashboard'); loadDashboard();
-      if('serviceWorker' in navigator) navigator.serviceWorker.ready.then(function(reg){setupPush(reg);}).catch(function(){});
-      // Handle returning from ad page
+function checkAuth(){
+  var path=window.location.pathname;
+  api('/api/auth/me').then(function(r){
+    if(r&&r.user){
+      S.user=r.user;updateNavUser();showPage('page-dashboard');loadDashboard();
+      if('serviceWorker' in navigator)navigator.serviceWorker.ready.then(function(reg){setupPush(reg);}).catch(function(){});
       var rp=new URLSearchParams(window.location.search).get('resume');
       if(rp){history.replaceState({},'','/');setTimeout(function(){initiateTest(rp);},900);}
     } else {
-      if(path==='/register') showPage('page-register');
-      else if(path==='/login') showPage('page-login');
-      else { showPage('page-home'); loadHomeStats(); }
+      if(path==='/register')showPage('page-register');
+      else if(path==='/login')showPage('page-login');
+      else{showPage('page-home');loadHomeStats();}
     }
   }).catch(function(){
-    if(path==='/register') showPage('page-register');
-    else if(path==='/login') showPage('page-login');
-    else { showPage('page-home'); loadHomeStats(); }
+    if(path==='/register')showPage('page-register');
+    else if(path==='/login')showPage('page-login');
+    else{showPage('page-home');loadHomeStats();}
   });
 }
 
-// ── HOME ──────────────────────────────────────────────────────────────
-function loadHomeStats() {
+function loadHomeStats(){
   Promise.all([
     fetch('/api/rankings/top-performers').then(function(r){return r.json();}).catch(function(){return[];}),
     fetch('/api/admin/stats').then(function(r){return r.json();}).catch(function(){return null;})
-  ]).then(function(results) {
-    var top=results[0], stats=results[1];
+  ]).then(function(res){
+    var top=res[0],stats=res[1];
     var el=document.getElementById('home-preview-ranks');
-    if(el&&Array.isArray(top)&&top.length) {
+    if(el&&Array.isArray(top)&&top.length){
       el.innerHTML=top.slice(0,5).map(function(u,i){
         var bLabel={'11':'11th','12':'12th','dropper':'Drop'}[u.batch]||'';
         return '<div class="rpc-item"><span class="rpc-rank '+((['r1','r2','r3'][i])||'rn')+'">'+(i+1)+'</span><span class="rpc-name">'+esc(u.name||'Student')+' <small style="opacity:0.6">'+bLabel+'</small></span><span class="rpc-score">'+(u.totalMarks||0)+'</span></div>';
@@ -935,153 +867,135 @@ function loadHomeStats() {
     if(stats){setEl('stat-students',stats.totalStudents||'0');setEl('stat-tests',stats.totalTests||'0');setEl('stat-attempts',stats.totalAttempts||'0');}
   }).catch(function(){});
 }
-).then(function(imgs){
-    var c=document.getElementById('home-gallery');
-    if(!c||!imgs.length){if(c)c.innerHTML='';return;}
-    c.innerHTML=imgs.map(function(img){
-      return '<div class="gallery-img-wrap" onclick="'+(img.redirectUrl?'window.open(\''+esc(img.redirectUrl)+'\',\'_blank\')':'')+'">' +
-        '<img src="'+img.imageData+'" alt="'+esc(img.title||'')+'" loading="lazy">' +
-        (img.title?'<div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.6));padding:10px 12px;color:#fff;font-size:12px;font-weight:600">'+esc(img.title)+'</div>':'') +
+
+function loadHomeGallery(){
+  fetch('/api/public/ad-images').then(function(r){return r.json();}).then(function(imgs){
+    var el=document.getElementById('home-gallery');if(!el)return;
+    if(!imgs||!imgs.length){el.innerHTML='<p style="color:var(--text-muted);text-align:center;padding:24px">No gallery images yet.</p>';return;}
+    el.innerHTML=imgs.map(function(img){
+      var click=img.redirectUrl?'onclick="window.open(\''+img.redirectUrl.replace(/'/g,'%27')+'\',\'_blank\',\'noopener\')" style="cursor:pointer"':'';
+      return '<div class="gallery-img-wrap" '+click+'><img src="'+img.imageData+'" alt="'+esc(img.title||'')+'" loading="lazy" style="width:100%;height:100%;object-fit:cover">'+
+        (img.title||img.description?'<div class="gallery-img-caption"><strong>'+esc(img.title||'')+'</strong>'+(img.description?'<span>'+esc(img.description)+'</span>':'')+'</div>':'')+
         '</div>';
     }).join('');
   }).catch(function(){});
 }
 
-// ── PUSH ─────────────────────────────────────────────────────────────
-function setupPush(reg) {
-  api('/api/push/vapid-public-key').then(function(data) {
+function setupPush(reg){
+  api('/api/push/vapid-public-key').then(function(data){
     if(!data.publicKey)return;
     reg.pushManager.getSubscription().then(function(sub){
-      if(!sub) return reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToUint8(data.publicKey)});
+      if(!sub)return reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToUint8(data.publicKey)});
       return sub;
     }).then(function(sub){
-      if(S.user) api('/api/push/subscribe',{method:'POST',body:JSON.stringify({subscription:sub})}).catch(function(){});
+      if(S.user)api('/api/push/subscribe',{method:'POST',body:JSON.stringify({subscription:sub})}).catch(function(){});
     });
   }).catch(function(){});
 }
 function urlB64ToUint8(b64){var p='='.repeat((4-b64.length%4)%4);var base64=(b64+p).replace(/-/g,'+').replace(/_/g,'/');var raw=window.atob(base64);var arr=new Uint8Array(raw.length);for(var i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);return arr;}
 
-// ── REGISTER (password-based, no OTP) ────────────────────────────────
-function selectBatch(b) {
+function selectBatch(b){
   document.getElementById('reg-batch').value=b;
-  ['11','12','dropper'].forEach(function(x){
-    var el=document.getElementById('bopt-'+x);
-    if(el){el.className='batch-opt'+(x===b?' selected-'+x:'');}
-  });
+  ['11','12','dropper'].forEach(function(x){var el=document.getElementById('bopt-'+x);if(el)el.className='batch-opt'+(x===b?' selected-'+x:'');});
 }
-function handleRegister(e) {
+
+function handleRegister(e){
   e.preventDefault();
   var batch=gv('reg-batch');
-  if(!batch){toast('Please select your batch (11th / 12th / Dropper)','error');return;}
+  if(!batch){toast('Please select your batch','error');return;}
   var btn=document.getElementById('reg-btn');
-  btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Creating account...';
-  var payload={
-    name:gv('reg-name'),email:gv('reg-email'),phone:gv('reg-phone'),
-    password:gv('reg-password'),coachingName:gv('reg-coaching'),
-    fatherName:gv('reg-father'),fatherOccupation:gv('reg-occupation'),
-    whatsappNumber:gv('reg-whatsapp'),batch:batch
-  };
+  btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Creating...';
+  var payload={name:gv('reg-name'),email:gv('reg-email'),phone:gv('reg-phone'),password:gv('reg-password'),coachingName:gv('reg-coaching'),fatherName:gv('reg-father'),fatherOccupation:gv('reg-occupation'),whatsappNumber:gv('reg-whatsapp'),batch:batch};
   api('/api/auth/register',{method:'POST',body:JSON.stringify(payload)}).then(function(r){
-    S.user=r.user; updateNavUser();
-    toast('Account created! Welcome '+r.user.name,'success');
-    showPage('page-dashboard'); loadDashboard();
-    if(window._pendingResume){var rid=window._pendingResume;window._pendingResume=null;setTimeout(function(){initiateTest(rid);},800);}
+    btn.disabled=false;btn.innerHTML='<i class="fas fa-user-plus"></i> Create Account';
+    S.user=r.user;updateNavUser();toast('Welcome, '+r.user.name+'!','success');
+    showPage('page-dashboard');loadDashboard();
+    if(window._pendingResume){var rid=window._pendingResume;window._pendingResume=null;setTimeout(function(){initiateTest(rid);},900);}
   }).catch(function(err){
+    btn.disabled=false;btn.innerHTML='<i class="fas fa-user-plus"></i> Create Account';
     toast(err.message||'Registration failed','error');
-  }).finally? null : undefined;
-  // manual finally
-  api('/api/auth/register',{method:'POST',body:JSON.stringify(payload)}).then(function(){}).catch(function(){
-    btn.disabled=false; btn.innerHTML='<i class="fas fa-user-plus"></i> Create Account';
   });
 }
 
-// ── LOGIN ─────────────────────────────────────────────────────────────
-function handleLogin() {
-  var identifier=gv('login-id'), password=gv('login-pw');
+function handleLogin(){
+  var identifier=gv('login-id'),password=gv('login-pw');
   if(!identifier||!password){toast('Enter email/phone and password','error');return;}
   var btn=document.getElementById('login-btn');
-  btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Logging in...';
+  btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Logging in...';
   api('/api/auth/login',{method:'POST',body:JSON.stringify({identifier:identifier,password:password})}).then(function(r){
-    btn.disabled=false; btn.innerHTML='<i class="fas fa-sign-in-alt"></i> Login';
-    S.user=r.user; updateNavUser();
-    toast('Welcome back, '+r.user.name+'!','success');
-    showPage('page-dashboard'); loadDashboard();
-    if(window._pendingResume){var rid2=window._pendingResume;window._pendingResume=null;setTimeout(function(){initiateTest(rid2);},800);}
-    if('serviceWorker' in navigator) navigator.serviceWorker.ready.then(function(reg){setupPush(reg);}).catch(function(){});
+    btn.disabled=false;btn.innerHTML='<i class="fas fa-sign-in-alt"></i> Login';
+    S.user=r.user;updateNavUser();toast('Welcome back, '+r.user.name+'!','success');
+    showPage('page-dashboard');loadDashboard();
+    if('serviceWorker' in navigator)navigator.serviceWorker.ready.then(function(reg){setupPush(reg);}).catch(function(){});
+    if(window._pendingResume){var rid=window._pendingResume;window._pendingResume=null;setTimeout(function(){initiateTest(rid);},900);}
   }).catch(function(err){
-    btn.disabled=false; btn.innerHTML='<i class="fas fa-sign-in-alt"></i> Login';
+    btn.disabled=false;btn.innerHTML='<i class="fas fa-sign-in-alt"></i> Login';
     toast(err.message||'Login failed','error');
   });
 }
 
-// ── FORGOT PASSWORD ────────────────────────────────────────────────────
-function sendForgotOtp() {
-  var email=gv('forgot-email');
-  if(!email){toast('Enter your email address','error');return;}
+function sendForgotOtp(){
+  var email=gv('forgot-email');if(!email){toast('Enter your email','error');return;}
   var btn=document.getElementById('forgot-btn');
-  if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Sending OTP...';}
+  btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Sending...';
   window._forgotEmail=email;
   api('/api/auth/forgot-password',{method:'POST',body:JSON.stringify({email:email})}).then(function(){
-    if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> Send OTP';}
+    btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> Send OTP';
     document.getElementById('forgot-step-1').classList.add('hidden');
     document.getElementById('forgot-step-2').classList.remove('hidden');
     setEl('forgot-otp-hint','OTP sent to '+email);
-    toast('OTP sent to your email','success');
+    toast('OTP sent! Check inbox and spam folder.','success');
   }).catch(function(err){
-    if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> Send OTP';}
+    btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> Send OTP';
     toast(err.message||'Failed to send OTP','error');
   });
 }
-function resetPassword() {
+
+function resetPassword(){
   var boxes=document.querySelectorAll('#page-forgot .otp-box');
-  var otp=''; for(var i=0;i<boxes.length;i++) otp+=boxes[i].value;
-  if(otp.length!==6){toast('Enter all 6 OTP digits','error');return;}
-  var np=gv('new-password');
-  if(!np||np.length<6){toast('Password must be at least 6 characters','error');return;}
+  var otp='';for(var i=0;i<boxes.length;i++)otp+=boxes[i].value;
+  if(otp.length!==6){toast('Enter all 6 digits','error');return;}
+  var np=gv('new-password');if(!np||np.length<6){toast('Password must be at least 6 characters','error');return;}
   var btn=document.getElementById('reset-btn');
-  btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Resetting...';
+  btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Resetting...';
   api('/api/auth/reset-password',{method:'POST',body:JSON.stringify({email:window._forgotEmail,otp:otp,newPassword:np})}).then(function(){
-    btn.disabled=false; btn.innerHTML='<i class="fas fa-lock"></i> Reset Password';
+    btn.disabled=false;btn.innerHTML='<i class="fas fa-lock"></i> Reset Password';
     toast('Password reset! Please login.','success');
     document.getElementById('forgot-step-1').classList.remove('hidden');
     document.getElementById('forgot-step-2').classList.add('hidden');
     showPage('page-login');
   }).catch(function(err){
-    btn.disabled=false; btn.innerHTML='<i class="fas fa-lock"></i> Reset Password';
+    btn.disabled=false;btn.innerHTML='<i class="fas fa-lock"></i> Reset Password';
     toast(err.message||'Reset failed','error');
   });
 }
+
 function otpMove(el,idx){el.value=el.value.replace(/\D/g,'');var all=document.querySelectorAll('#page-forgot .otp-box');if(el.value&&idx<all.length-1)all[idx+1].focus();}
 function otpBack(e,idx){var all=document.querySelectorAll('#page-forgot .otp-box');if(e.key==='Backspace'&&!all[idx].value&&idx>0)all[idx-1].focus();if(e.key==='Enter')resetPassword();}
 
-function updateNavUser() {
+function updateNavUser(){
   if(!S.user)return;
   var n=document.getElementById('nav-user-name');if(n)n.textContent=S.user.name.split(' ')[0];
   var d=document.getElementById('dash-student-name');if(d)d.textContent=S.user.name;
   var c=document.getElementById('dash-coaching-name');if(c)c.textContent=S.user.coachingName||'';
   var bp=document.getElementById('nav-batch-pill');
-  if(bp){
-    var bMap={'11':'Class 11','12':'Class 12','dropper':'Dropper'};
-    var bClass={'11':'batch-11','12':'batch-12','dropper':'batch-drop'};
-    bp.textContent=bMap[S.user.batch]||S.user.batch;
-    bp.className='batch-pill '+(bClass[S.user.batch]||'');
-  }
+  if(bp){var bMap={'11':'Class 11','12':'Class 12','dropper':'Dropper'};var bCls={'11':'batch-11','12':'batch-12','dropper':'batch-drop'};bp.textContent=bMap[S.user.batch]||S.user.batch;bp.className='batch-pill '+(bCls[S.user.batch]||'');}
 }
-function logout() {
+
+function logout(){
   api('/api/auth/logout',{method:'POST'}).catch(function(){});
-  S.user=null; S.isAdmin=false;
+  S.user=null;S.isAdmin=false;
   history.pushState({},'','/');
-  showPage('page-home'); loadHomeStats(); loadHomeGallery();
+  showPage('page-home');loadHomeStats();loadHomeGallery();
   toast('Logged out','info');
 }
 
-// ── DASHBOARD ─────────────────────────────────────────────────────────
 function loadDashboard(){updateNavUser();loadTests();}
+
 function switchTab(tab){
-  var tabs=document.querySelectorAll('#page-dashboard .dtab');
-  for(var i=0;i<tabs.length;i++)tabs[i].classList.remove('active');
+  document.querySelectorAll('#page-dashboard .dtab').forEach(function(t){t.classList.remove('active');});
   var el=document.getElementById('dash-tab-'+tab);if(el)el.classList.add('active');
-  document.querySelectorAll('#page-dashboard .nav-link').forEach(function(l){l.classList.toggle('active',l.getAttribute('onclick')||'').indexOf && (l.getAttribute('onclick')||'').indexOf("'"+tab+"'")!==-1;});
+  document.querySelectorAll('#page-dashboard .nav-link').forEach(function(l){l.classList.toggle('active',(l.getAttribute('onclick')||'').indexOf("'"+tab+"'")!==-1);});
   document.querySelectorAll('#page-dashboard .mob-btn').forEach(function(l){l.classList.toggle('active',(l.getAttribute('onclick')||'').indexOf("'"+tab+"'")!==-1);});
   if(tab==='tests')loadTests();
   else if(tab==='my-results')loadMyResults();
@@ -1089,8 +1003,7 @@ function switchTab(tab){
   else if(tab==='gallery')loadStudentGallery();
 }
 
-// ── TESTS ─────────────────────────────────────────────────────────────
-function loadTests() {
+function loadTests(){
   var c=document.getElementById('tests-list');if(!c)return;
   c.innerHTML='<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
   api('/api/tests').then(function(tests){
@@ -1102,56 +1015,43 @@ function loadTests() {
       card+='<div class="tc-topic"><i class="fas fa-tag" style="color:var(--gold);margin-right:4px;font-size:10px"></i>'+esc(t.topic)+'</div>';
       card+='<div class="tc-meta"><span><i class="fas fa-clock"></i>'+t.duration+'min</span><span><i class="fas fa-question-circle"></i>'+(t.questions?t.questions.length:'?')+'Q</span><span><i class="fas fa-star"></i>'+(t.totalMarks||'?')+' marks</span></div>';
       card+='<div class="tc-footer"><span style="font-size:11px;color:var(--text-muted)"><i class="fas fa-users"></i>'+(t.attemptCount||0)+' attempts</span>';
-      if(t.attempted){card+='<span class="done-badge"><i class="fas fa-check"></i> '+(t.myResult&&t.myResult.obtainedMarks!=null?t.myResult.obtainedMarks:'?')+'/'+(t.totalMarks||'?')+'</span>';}
-      else if(t.inProgress){card+='<button class="btn btn-sm" style="background:#fef3c7;color:#92400e;border:none;cursor:pointer;border-radius:8px;padding:7px 13px;font-weight:600" onclick="initiateTest(\''+t._id+'\')"><i class="fas fa-redo"></i> Resume</button>';}
-      else{card+='<button class="btn btn-gold btn-sm" onclick="initiateTest(\''+t._id+'\')"><i class="fas fa-play"></i> Attempt</button>';}
+      if(t.attempted)card+='<span class="done-badge"><i class="fas fa-check"></i> '+(t.myResult&&t.myResult.obtainedMarks!=null?t.myResult.obtainedMarks:'?')+'/'+(t.totalMarks||'?')+'</span>';
+      else if(t.inProgress)card+='<button class="btn btn-sm" style="background:#fef3c7;color:#92400e;border:none;cursor:pointer;border-radius:8px;padding:7px 13px;font-weight:600" onclick="initiateTest(\''+t._id+'\')"><i class="fas fa-redo"></i> Resume</button>';
+      else card+='<button class="btn btn-gold btn-sm" onclick="initiateTest(\''+t._id+'\')"><i class="fas fa-play"></i> Attempt</button>';
       card+='</div></div>';
       return card;
     }).join('');
   }).catch(function(err){c.innerHTML='<p style="color:var(--red);padding:20px">'+esc(err.message)+'</p>';});
 }
 
-// ── TEST FLOW ─────────────────────────────────────────────────────────
-function initiateTest(testId) {
-  S.currentTestId = testId;
-  api('/api/tests/' + testId).then(function(test) {
-    S.pendingTestId  = testId;
-    S.pendingTestData = test;
-    // Check if ad is enabled for this test
-    api('/api/tests/' + testId + '/ad').then(function(ad) {
-      if (ad && ad.adEnabled && ad.images && ad.images.length > 0) {
-        // Go to standalone ad page — it returns back here via ?resume=testId
-        var ret  = encodeURIComponent('/?resume=' + testId);
-        var name = encodeURIComponent(test.title || '');
-        window.location.href = '/ad856eyqafggg?return=' + ret + '&test=' + name;
+function initiateTest(testId){
+  S.currentTestId=testId;
+  api('/api/tests/'+testId).then(function(test){
+    S.pendingTestId=testId;S.pendingTestData=test;
+    api('/api/tests/'+testId+'/ad').then(function(ad){
+      if(ad&&ad.adEnabled&&ad.images&&ad.images.length>0){
+        var ret=encodeURIComponent('/?resume='+testId);
+        var name=encodeURIComponent(test.title||'');
+        window.location.href='/ad856eyqafggg?return='+ret+'&test='+name;
       } else {
         showFsPrompt(test);
       }
-    }).catch(function() { showFsPrompt(test); });
-  }).catch(function(err) { toast(err.message, 'error'); });
+    }).catch(function(){showFsPrompt(test);});
+  }).catch(function(err){toast(err.message,'error');});
 }
-function runAdCountdown(sec){
-  var s=sec,btn=document.getElementById('start-test-btn');
-  if(btn)btn.disabled=true;
-  var iv=setInterval(function(){
-    s--;setEl('ad-countdown',s);
-    var fill=document.getElementById('ad-prog-fill');if(fill)fill.style.width=(((sec-s)/sec)*100)+'%';
-    if(s<=0){clearInterval(iv);if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-play"></i> Start Test Now';}}
-  },1000);
-}
-function startTestNow(){if(S.pendingTestData){showFsPrompt(S.pendingTestData);S.pendingTestData=null;}}
+
 function showFsPrompt(test){
   S.currentTest=test;
   var wb=document.getElementById('resume-warning-box');
   if(wb){
     if(test.resumeData){
-      var ans=test.resumeData.savedAnswers||{};
-      var cnt=Object.keys(ans).length;
-      wb.innerHTML='<div class="resume-warning"><i class="fas fa-info-circle"></i> <strong>Resuming test</strong> — you had answered '+cnt+' question(s) before. You have '+(3-(test.resumeData.violations||0))+' warnings remaining.</div>';
-    } else { wb.innerHTML=''; }
+      var cnt=Object.keys(test.resumeData.savedAnswers||{}).length;
+      wb.innerHTML='<div class="resume-warning"><i class="fas fa-info-circle"></i> <strong>Resuming</strong> — '+cnt+' answers saved. Violations: '+(test.resumeData.violations||0)+'/3.</div>';
+    } else wb.innerHTML='';
   }
   var fsp=document.getElementById('fs-prompt');if(fsp)fsp.classList.remove('hidden');
 }
+
 function enterFullscreen(){
   closeModal('fs-prompt');
   try{var el=document.documentElement;if(el.requestFullscreen)el.requestFullscreen();else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();}catch(e){}
@@ -1159,28 +1059,22 @@ function enterFullscreen(){
   showPage('page-test');
   setupAntiCheat();
 }
+
 function loadTestPage(test){
-  // Restore saved answers if resuming
   if(test.resumeData&&test.resumeData.savedAnswers){
-    S.answers={}; var sa=test.resumeData.savedAnswers;
-    Object.keys(sa).forEach(function(k){ S.answers[parseInt(k)]=sa[k]; });
+    S.answers={};Object.keys(test.resumeData.savedAnswers).forEach(function(k){S.answers[parseInt(k)]=test.resumeData.savedAnswers[k];});
     S.violations=test.resumeData.violations||0;
-  } else {
-    S.answers={}; S.violations=0;
-  }
-  S.qIdx=0; S.startTime=Date.now();
-  S.timerTotal=test.duration*60; S.timerLeft=test.duration*60;
+  } else {S.answers={};S.violations=0;}
+  S.qIdx=0;S.startTime=Date.now();S.timerTotal=test.duration*60;S.timerLeft=test.duration*60;
   setEl('test-subject-badge',test.subject);setEl('test-title-hdr',test.title);setEl('tot-q',test.questions.length);
   buildPalette(test.questions.length);
   if(S.timerIv)clearInterval(S.timerIv);
   S.timerIv=setInterval(tickTimer,1000);
-  // Auto-save every 10 seconds
   if(S.saveIv)clearInterval(S.saveIv);
   S.saveIv=setInterval(saveProgress,10000);
   renderQ(0);
 }
 
-// ── ANTI-CHEAT ────────────────────────────────────────────────────────
 function setupAntiCheat(){
   document.addEventListener('visibilitychange',handleVisChange);
   document.addEventListener('fullscreenchange',handleFsChange);
@@ -1202,68 +1096,57 @@ function handleVisChange(){var tp=document.getElementById('page-test');if(!tp||!
 function handleFsChange(){var tp=document.getElementById('page-test');if(!tp||!tp.classList.contains('active'))return;if(!document.fullscreenElement&&!document.webkitFullscreenElement)logViolation('Exited fullscreen');}
 function handleBlur(){var tp=document.getElementById('page-test');if(!tp||!tp.classList.contains('active'))return;logViolation('Window lost focus');}
 function logViolation(details){
-  S.violations++;
-  var MAX=3,left=MAX-S.violations;
+  S.violations++;var MAX=3,left=MAX-S.violations;
   setEl('cheat-title','Violation Detected!');setEl('cheat-msg',details);
-  setEl('cheat-count-msg',S.violations>=MAX?'Auto-submitting test now!':'Warning '+S.violations+'/'+MAX+' — '+left+' more will auto-submit');
+  setEl('cheat-count-msg',S.violations>=MAX?'Auto-submitting now!':'Warning '+S.violations+'/'+MAX+' — '+left+' more = auto-submit');
   var cm=document.getElementById('cheat-modal');if(cm)cm.classList.remove('hidden');
   saveProgress();
   api('/api/push/cheat-log',{method:'POST',body:JSON.stringify({testId:S.currentTest._id,testTitle:S.currentTest.title,violations:S.violations,autoSubmitted:S.violations>=MAX,details:details})}).catch(function(){});
-  if(S.violations>=MAX){setTimeout(function(){closeModal('cheat-modal');submitTest();},1800);}
+  if(S.violations>=MAX)setTimeout(function(){closeModal('cheat-modal');submitTest();},1800);
 }
-
-// ── SAVE PROGRESS ─────────────────────────────────────────────────────
 function saveProgress(){
   if(!S.currentTest)return;
   api('/api/tests/'+S.currentTest._id+'/save-progress',{method:'POST',body:JSON.stringify({savedAnswers:S.answers,violations:S.violations})}).catch(function(){});
 }
 
-// ── TEST RENDER ───────────────────────────────────────────────────────
-function buildPalette(n){
-  var g=document.getElementById('palette-grid');if(!g)return;
-  var h='';for(var i=0;i<n;i++)h+='<button class="p-btn" id="pb-'+i+'" onclick="goToQ('+i+')">'+(i+1)+'</button>';
-  g.innerHTML=h;
-}
+function buildPalette(n){var g=document.getElementById('palette-grid');if(!g)return;var h='';for(var i=0;i<n;i++)h+='<button class="p-btn" id="pb-'+i+'" onclick="goToQ('+i+')">'+(i+1)+'</button>';g.innerHTML=h;}
+
 function renderQ(idx){
   var test=S.currentTest;if(!test||idx<0||idx>=test.questions.length)return;
   var q=test.questions[idx];S.qIdx=idx;
   var badge=document.getElementById('q-badge');if(badge)badge.textContent='Q'+(idx+1);
-  var mcBadge=document.getElementById('q-mc-badge');
-  if(mcBadge){if(q.isMultiChoice)mcBadge.classList.remove('hidden');else mcBadge.classList.add('hidden');}
-  document.getElementById('q-text').innerHTML=q.questionText;
+  var mcBadge=document.getElementById('q-mc-badge');if(mcBadge){if(q.isMultiChoice)mcBadge.classList.remove('hidden');else mcBadge.classList.add('hidden');}
+  document.getElementById('q-text').innerHTML=q.questionText||'';
   setEl('cur-q',idx+1);setEl('q-marks',q.marks||4);setEl('q-neg',q.negativeMarks||1);
   var iw=document.getElementById('q-img-wrap'),im=document.getElementById('q-img');
   if(iw&&im){if(q.questionImage){im.src=q.questionImage;iw.classList.remove('hidden');}else iw.classList.add('hidden');}
   var letters=['A','B','C','D','E','F'];
-  var sel=S.answers[idx];  // for single: number; for multi: array
+  var sel=S.answers[idx];
   var optsHtml='';
   for(var i=0;i<q.options.length;i++){
     var isSelected=q.isMultiChoice?(Array.isArray(sel)&&sel.indexOf(i)!==-1):(sel===i);
-    optsHtml+='<button class="opt-btn'+(isSelected?(q.isMultiChoice?' selected-multi':' selected'):'')+'" onclick="selectOpt('+i+')">' +
-      '<span class="opt-letter">'+letters[i]+'</span><span class="opt-text">'+esc(q.options[i].text)+'</span></button>';
+    var optCls='opt-btn'+(isSelected?(q.isMultiChoice?' selected-multi':' selected'):'');
+    var optImg=q.options[i].imageData?'<img src="'+q.options[i].imageData+'" style="max-height:60px;border-radius:4px;display:block;margin-top:6px">':'';
+    optsHtml+='<button class="'+optCls+'" onclick="selectOpt('+i+')">'+'<span class="opt-letter">'+letters[i]+'</span><span class="opt-text">'+esc(q.options[i].text||'')+optImg+'</span></button>';
   }
   document.getElementById('opts-list').innerHTML=optsHtml;
-  // Update palette
   var pbts=document.querySelectorAll('.p-btn');
   for(var j=0;j<pbts.length;j++){
     pbts[j].className='p-btn';
     var ans=S.answers[j];
     if(ans!==undefined&&ans!==null&&!(Array.isArray(ans)&&ans.length===0)){
-      var qt=test.questions[j];
-      pbts[j].classList.add(qt&&qt.isMultiChoice?'answered-multi':'answered');
+      pbts[j].classList.add(test.questions[j]&&test.questions[j].isMultiChoice?'answered-multi':'answered');
     }
     if(j===idx)pbts[j].classList.add('current');
   }
-  var fill=document.getElementById('mini-fill');
-  if(fill)fill.style.width=(Object.keys(S.answers).length/test.questions.length*100)+'%';
+  var fill=document.getElementById('mini-fill');if(fill)fill.style.width=(Object.keys(S.answers).length/test.questions.length*100)+'%';
   var prev=document.getElementById('prev-btn');if(prev)prev.disabled=(idx===0);
 }
 function selectOpt(i){
   var q=S.currentTest.questions[S.qIdx];
   if(q.isMultiChoice){
     var arr=Array.isArray(S.answers[S.qIdx])?S.answers[S.qIdx]:[];
-    var pos=arr.indexOf(i);
-    if(pos===-1)arr.push(i);else arr.splice(pos,1);
+    var pos=arr.indexOf(i);if(pos===-1)arr.push(i);else arr.splice(pos,1);
     if(arr.length===0)delete S.answers[S.qIdx];else S.answers[S.qIdx]=arr;
   } else {
     S.answers[S.qIdx]=i;
@@ -1275,7 +1158,6 @@ function saveNext(){var n=S.qIdx+1;if(n<S.currentTest.questions.length)renderQ(n
 function goQ(d){var n=S.qIdx+d;if(n>=0&&n<S.currentTest.questions.length)renderQ(n);}
 function goToQ(i){renderQ(i);}
 
-// ── TIMER ─────────────────────────────────────────────────────────────
 function tickTimer(){
   S.timerLeft--;
   if(S.timerLeft<=0){clearInterval(S.timerIv);toast('Time up! Auto-submitting...','info');submitTest();return;}
@@ -1295,10 +1177,10 @@ function submitTest(){
   if(S.timerIv)clearInterval(S.timerIv);
   if(S.saveIv)clearInterval(S.saveIv);
   teardownAntiCheat();
-  var timeTaken=S.timerTotal-S.timerLeft;
+  var timeTaken=Math.max(0,S.timerTotal-S.timerLeft);
   var answers=S.currentTest.questions.map(function(q,i){
     var ans=S.answers[i];
-    if(q.isMultiChoice) return{questionId:q._id,selectedOptions:Array.isArray(ans)?ans:[]};
+    if(q.isMultiChoice)return{questionId:q._id,selectedOptions:Array.isArray(ans)?ans:[]};
     return{questionId:q._id,selectedOption:(ans!==undefined&&ans!==null)?ans:-1};
   });
   api('/api/results/submit',{method:'POST',body:JSON.stringify({testId:S.currentTest._id,answers:answers,startedAt:new Date(S.startTime).toISOString(),timeTaken:timeTaken})}).then(function(r){
@@ -1309,20 +1191,20 @@ function submitTest(){
   }).catch(function(err){toast(err.message,'error');});
 }
 
-// ── RESULT ────────────────────────────────────────────────────────────
 function showResultPage(r){
   setEl('res-obtained',r.obtainedMarks);setEl('res-total','/'+r.totalMarks);
   setEl('res-pct',r.percentage+'%');setEl('rs-correct',r.correctAnswers);
   setEl('rs-wrong',r.wrongAnswers);setEl('rs-skip',r.notAttempted);
   setEl('rs-time',Math.floor(r.timeTaken/60)+'m '+(r.timeTaken%60)+'s');
-  setEl('res-rank','#'+r.rank);setEl('res-batch-rank','#'+(r.batchRank||'—'));
+  setEl('res-rank','#'+(r.rank||'—'));setEl('res-batch-rank','#'+(r.batchRank||'—'));
   var bMap={'11':'Class 11','12':'Class 12','dropper':'Dropper'};
   setEl('res-batch-label',(bMap[r.batch]||'Batch')+' Rank');
   setEl('res-batch-name',bMap[r.batch]||'');
-  setTimeout(function(){var arc=document.getElementById('score-arc');if(arc)arc.style.strokeDashoffset=427*(1-r.obtainedMarks/r.totalMarks);},400);
+  setTimeout(function(){var arc=document.getElementById('score-arc');if(arc&&r.totalMarks>0)arc.style.strokeDashoffset=427*(1-r.obtainedMarks/r.totalMarks);},400);
   var ap=document.getElementById('analysis-panel');if(ap)ap.classList.add('hidden');
   var rp=document.getElementById('ranking-panel');if(rp)rp.classList.add('hidden');
 }
+
 function viewAnalysis(){
   var panel=document.getElementById('analysis-panel');if(!panel)return;
   if(!panel.classList.contains('hidden')){panel.classList.add('hidden');return;}
@@ -1330,229 +1212,161 @@ function viewAnalysis(){
   api('/api/results/my/'+testId).then(function(data){
     var result=data.result,test=data.test;
     var letters=['A','B','C','D','E','F'];
-    document.getElementById('analysis-items').innerHTML=test.questions.map(function(q,i){
-      var ans=result.answers.find(function(a){return String(a.questionId)===String(q._id);});
+    document.getElementById('analysis-items').innerHTML=(test.questions||[]).map(function(q,i){
+      var ans=(result.answers||[]).find(function(a){return String(a.questionId)===String(q._id);});
       var selSingle=ans?ans.selectedOption:-1;
       var selMulti=ans?ans.selectedOptions||[]:[]; 
-      return '<div class="analysis-item"><div class="ai-q"><strong>Q'+(i+1)+'.</strong> '+(q.isMultiChoice?'<span class="q-mc-badge" style="display:inline">Multi-Choice</span> ':'')+q.questionText+'</div>' +
+      return '<div class="analysis-item"><div class="ai-q"><strong>Q'+(i+1)+'.</strong> '+(q.isMultiChoice?'<span class="q-mc-badge" style="display:inline">Multi</span> ':'')+esc(q.questionText||'')+'</div>'+
         '<div class="ai-opts">'+q.options.map(function(o,j){
           var isCorrect=o.isCorrect;
           var isSelected=q.isMultiChoice?(selMulti.indexOf(j)!==-1):(selSingle===j);
           var cls=isCorrect?'correct':(isSelected&&!isCorrect?'wrong':'');
-          return '<div class="ai-opt '+cls+'"><strong>'+letters[j]+'.</strong> '+esc(o.text)+(isCorrect?' <i class="fas fa-check-circle" style="margin-left:auto"></i>':'')+(isSelected&&!isCorrect?' <i class="fas fa-times-circle" style="margin-left:auto"></i>':'')+'</div>';
-        }).join('')+'</div>' +
-        (q.explanation?'<div style="margin-top:8px;padding:8px 12px;background:var(--gold-pale);border-radius:8px;font-size:12px;color:var(--text-sec)"><i class="fas fa-lightbulb" style="color:var(--gold)"></i> '+esc(q.explanation)+'</div>':'') +
+          return '<div class="ai-opt '+cls+'"><strong>'+letters[j]+'.</strong> '+esc(o.text||'')+(isCorrect?' <i class="fas fa-check-circle" style="margin-left:auto"></i>':'')+(isSelected&&!isCorrect?' <i class="fas fa-times-circle" style="margin-left:auto"></i>':'')+'</div>';
+        }).join('')+'</div>'+
+        (q.explanation?'<div style="margin-top:8px;padding:8px 12px;background:var(--gold-pale);border-radius:8px;font-size:12px"><i class="fas fa-lightbulb" style="color:var(--gold)"></i> '+esc(q.explanation)+'</div>':'')+
         '</div>';
     }).join('');
     panel.classList.remove('hidden');panel.scrollIntoView({behavior:'smooth'});
   }).catch(function(err){toast(err.message,'error');});
 }
+
 function viewRanking(){
   var panel=document.getElementById('ranking-panel');if(!panel)return;
   if(!panel.classList.contains('hidden')){panel.classList.add('hidden');return;}
   loadTestRankings(S.currentTest&&S.currentTest._id,'');
   panel.classList.remove('hidden');panel.scrollIntoView({behavior:'smooth'});
 }
+
 function loadTestRankings(testId,batch){
   testId=testId||(S.currentTest&&S.currentTest._id);if(!testId)return;
   var c=document.getElementById('ranking-table');if(!c)return;
   c.innerHTML='<p style="color:var(--text-muted);padding:12px">Loading...</p>';
-  // Update filter buttons
-  var btns=document.querySelectorAll('#ranking-batch-filter .bfbtn');
-  btns.forEach(function(b){b.classList.toggle('active',(b.getAttribute('onclick')||'').indexOf("'"+batch+"'"+(batch===''?")":''+(batch.length?'':" ")))!==-1||(batch===''&&(b.getAttribute('onclick')||'').indexOf("''")!==-1));});
-  api('/api/rankings/test/'+testId+'?batch='+batch+'&limit=100').then(function(data){
-    if(!data.rankings.length){c.innerHTML='<p style="text-align:center;color:var(--text-muted);padding:24px">No results yet for this filter.</p>';return;}
-    c.innerHTML='<div style="overflow-x:auto"><table class="rank-table"><thead><tr><th>Rank</th><th>Name</th><th>Coaching</th><th>Batch</th><th>Score</th><th>Time</th></tr></thead><tbody>'+
-      data.rankings.map(function(r,i){
-        var m=Math.floor(r.timeTaken/60),s=r.timeTaken%60;
-        var isMe=S.user&&r.userEmail===S.user.email;
-        var bMap={'11':'11th','12':'12th','dropper':'Drop'};
-        return '<tr class="'+((['rank-1','rank-2','rank-3'][i])||'')+' '+(isMe?'my-row':'')+'"><td>'+(i+1)+'</td><td>'+esc(r.userName||'—')+'</td><td>'+esc(r.coachingName||'—')+'</td><td>'+(bMap[r.batch]||'—')+'</td><td class="marks-cell">'+r.obtainedMarks+'/'+r.totalMarks+'</td><td>'+m+'m '+s+'s</td></tr>';
-      }).join('')+'</tbody></table></div>' +
-      '<p style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:10px">'+data.total+' attempted · Your rank: <strong>#'+(data.myRank||'—')+'</strong></p>';
+  api('/api/rankings/test/'+testId+'?batch='+batch+'&limit=200').then(function(data){
+    if(!data.rankings||!data.rankings.length){c.innerHTML='<p style="text-align:center;color:var(--text-muted);padding:20px">No results yet.</p>';return;}
+    var bMap={'11':'11th','12':'12th','dropper':'Drop'};
+    c.innerHTML='<div style="overflow-x:auto"><table class="rank-table"><thead><tr><th>Rank</th><th>Name</th><th>Email</th><th>Coaching</th><th>Batch</th><th>Score</th><th>Time</th></tr></thead><tbody>'+
+      data.rankings.map(function(r,i){var m=Math.floor(r.timeTaken/60),s=r.timeTaken%60;var isMe=S.user&&r.userEmail===S.user.email;
+        return '<tr class="'+((['rank-1','rank-2','rank-3'][i])||'')+' '+(isMe?'my-row':'')+'"><td>'+(i+1)+'</td><td>'+esc(r.userName||'—')+'</td><td style="font-size:11px;color:#888">'+esc(r.userEmail||'—')+'</td><td>'+esc(r.coachingName||'—')+'</td><td>'+(bMap[r.batch]||'—')+'</td><td class="marks-cell">'+r.obtainedMarks+'/'+r.totalMarks+'</td><td>'+m+'m '+s+'s</td></tr>';
+      }).join('')+'</tbody></table></div>'+
+      '<p style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:8px">'+data.total+' attempted &nbsp;|&nbsp; Your rank: <strong>#'+(data.myRank||'—')+'</strong></p>';
   }).catch(function(err){c.innerHTML='<p style="color:var(--red)">'+esc(err.message)+'</p>';});
 }
-function loadMyResults() {
-  var c = document.getElementById('my-results-list'); if (!c) return;
-  c.innerHTML = '<div class="skel" style="height:80px"></div><div class="skel" style="height:80px;margin-top:8px"></div>';
-  api('/api/results/my-results').then(function(rs) {
-    if (!rs.length) {
-      c.innerHTML = '<div style="text-align:center;padding:48px;color:var(--text-muted)"><i class="fas fa-clipboard-list" style="font-size:48px;display:block;margin-bottom:12px;opacity:0.3"></i>No tests attempted yet.</div>';
-      return;
-    }
-    var bMap = {'11':'Class 11', '12':'Class 12', 'dropper':'Dropper'};
-    c.innerHTML = rs.map(function(r) {
-      var testTitle = (r.testId && r.testId.title) || 'Test';
-      var subject   = (r.testId && r.testId.subject) || '';
-      var pct = r.totalMarks ? Math.round(r.obtainedMarks / r.totalMarks * 100) : 0;
-      var pctColor = pct >= 70 ? 'var(--green)' : pct >= 40 ? '#d97706' : 'var(--red)';
-      return '<div class="result-item" style="flex-direction:column;align-items:stretch;gap:12px">' +
-        // Header row
-        '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
-        '<div><div class="ri-title">' + esc(testTitle) + '</div>' +
-        '<div class="ri-meta">' + esc(subject) + ' &nbsp;|&nbsp; ' + new Date(r.submittedAt).toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'}) + '</div></div>' +
-        '<div style="text-align:right">' +
-        '<div class="ri-marks">' + r.obtainedMarks + '/' + r.totalMarks + '</div>' +
-        '<div style="font-size:12px;font-weight:700;color:' + pctColor + '">' + pct + '%</div>' +
-        '</div>' +
-        '</div>' +
-        // Stats row
-        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px;background:var(--bg-elevated,#f0ebe0);border-radius:8px;text-align:center">' +
-        '<div><div style="font-size:11px;color:var(--text-muted)">Correct</div><div style="font-weight:700;color:var(--green)">' + (r.correctAnswers||0) + '</div></div>' +
-        '<div><div style="font-size:11px;color:var(--text-muted)">Wrong</div><div style="font-weight:700;color:var(--red)">' + (r.wrongAnswers||0) + '</div></div>' +
-        '<div><div style="font-size:11px;color:var(--text-muted)">Skipped</div><div style="font-weight:700;color:var(--text-muted)">' + (r.notAttempted||0) + '</div></div>' +
-        '<div><div style="font-size:11px;color:var(--text-muted)">Time</div><div style="font-weight:700">' + Math.floor((r.timeTaken||0)/60) + 'm</div></div>' +
-        '</div>' +
-        // Ranks row
-        '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
-        '<div style="flex:1;padding:8px 12px;background:#fff;border:1.5px solid var(--gold-border,rgba(184,134,11,0.25));border-radius:8px;text-align:center">' +
-        '<div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px">Overall Rank</div>' +
-        '<div style="font-size:20px;font-weight:900;color:var(--gold);font-family:Georgia,serif">#' + (r.rank || '—') + '</div>' +
-        '<div style="font-size:10px;color:var(--text-muted)">All batches</div></div>' +
-        '<div style="flex:1;padding:8px 12px;background:#fff;border:1.5px solid var(--gold-border,rgba(184,134,11,0.25));border-radius:8px;text-align:center">' +
-        '<div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px">' + (bMap[r.batch]||'Batch') + ' Rank</div>' +
-        '<div style="font-size:20px;font-weight:900;color:#2b6cb0;font-family:Georgia,serif">#' + (r.batchRank || '—') + '</div>' +
-        '<div style="font-size:10px;color:var(--text-muted)">' + (bMap[r.batch]||'') + ' only</div></div>' +
-        '</div>' +
-        // Actions
-        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-        '<button class="btn btn-outline btn-sm" onclick="viewTestRankingFromResult('' + (r.testId && r.testId._id) + '','' + esc(r.batch) + '')"><i class="fas fa-list-ol"></i> View Rankings</button>' +
-        '<button class="btn btn-ghost btn-sm" onclick="viewTestAnalysisFromResult('' + (r.testId && r.testId._id) + '')"><i class="fas fa-microscope"></i> Analysis</button>' +
-        '</div>' +
+
+function loadMyResults(){
+  var c=document.getElementById('my-results-list');if(!c)return;
+  c.innerHTML='<div class="skel" style="height:80px"></div>';
+  api('/api/results/my-results').then(function(rs){
+    if(!rs.length){c.innerHTML='<div style="text-align:center;padding:48px;color:var(--text-muted)">No tests attempted yet.</div>';return;}
+    var bMap={'11':'Class 11','12':'Class 12','dropper':'Dropper'};
+    c.innerHTML=rs.map(function(r){
+      var testTitle=(r.testId&&r.testId.title)||'Test';
+      var subject=(r.testId&&r.testId.subject)||'';
+      var testId=r.testId&&r.testId._id;
+      var pct=r.totalMarks?Math.round(r.obtainedMarks/r.totalMarks*100):0;
+      var pctColor=pct>=70?'var(--green)':pct>=40?'#d97706':'var(--red)';
+      return '<div class="result-item" style="flex-direction:column;align-items:stretch;gap:10px">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'+
+        '<div><div class="ri-title">'+esc(testTitle)+'</div><div class="ri-meta">'+esc(subject)+' &nbsp;|&nbsp; '+new Date(r.submittedAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})+'</div></div>'+
+        '<div style="text-align:right"><div class="ri-marks">'+r.obtainedMarks+'/'+r.totalMarks+'</div><div style="font-size:12px;font-weight:700;color:'+pctColor+'">'+pct+'%</div></div>'+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px;background:var(--bg-elevated,#f0ebe0);border-radius:8px;text-align:center">'+
+        '<div><div style="font-size:10px;color:var(--text-muted)">Correct</div><div style="font-weight:700;color:var(--green)">'+(r.correctAnswers||0)+'</div></div>'+
+        '<div><div style="font-size:10px;color:var(--text-muted)">Wrong</div><div style="font-weight:700;color:var(--red)">'+(r.wrongAnswers||0)+'</div></div>'+
+        '<div><div style="font-size:10px;color:var(--text-muted)">Skipped</div><div style="font-weight:700">'+(r.notAttempted||0)+'</div></div>'+
+        '<div><div style="font-size:10px;color:var(--text-muted)">Time</div><div style="font-weight:700">'+Math.floor((r.timeTaken||0)/60)+'m</div></div>'+
+        '</div>'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<div style="flex:1;padding:8px 10px;background:#fff;border:1.5px solid var(--gold-border,rgba(184,134,11,0.25));border-radius:8px;text-align:center">'+
+        '<div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px">Overall Rank</div>'+
+        '<div style="font-size:22px;font-weight:900;color:var(--gold);font-family:Georgia,serif">#'+(r.rank||'—')+'</div>'+
+        '</div>'+
+        '<div style="flex:1;padding:8px 10px;background:#fff;border:1.5px solid rgba(43,108,176,0.25);border-radius:8px;text-align:center">'+
+        '<div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px">'+(bMap[r.batch]||'Batch')+' Rank</div>'+
+        '<div style="font-size:22px;font-weight:900;color:#2b6cb0;font-family:Georgia,serif">#'+(r.batchRank||'—')+'</div>'+
+        '</div>'+
+        '</div>'+
+        (testId?'<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn btn-outline btn-sm" onclick="showRankingModal(\''+testId+'\',\''+esc(r.batch||'')+'\')"><i class="fas fa-list-ol"></i> Rankings</button>'+
+        '</div>':'')+
         '</div>';
     }).join('');
-  }).catch(function(err) { c.innerHTML = '<p style="color:var(--red);padding:20px">' + esc(err.message) + '</p>'; });
+  }).catch(function(err){c.innerHTML='<p style="color:var(--red);padding:20px">'+esc(err.message)+'</p>';});
 }
 
-function viewTestRankingFromResult(testId, batch) {
-  if (!testId) return;
-  // Switch to leaderboard tab and load this specific test's rankings
-  // Show in a modal instead
-  showRankingModal(testId, batch);
-}
-
-function showRankingModal(testId, batch) {
-  var existing = document.getElementById('result-ranking-modal');
-  if (existing) existing.parentNode.removeChild(existing);
-  var modal = document.createElement('div');
-  modal.id = 'result-ranking-modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px';
-  modal.innerHTML = '<div style="background:#fff;border-radius:12px;padding:24px;max-width:680px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 4px 24px rgba(0,0,0,0.2)">' +
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">' +
-    '<h3 style="font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px"><i class="fas fa-list-ol" style="color:var(--gold)"></i> Test Rankings</h3>' +
-    '<button onclick="document.getElementById('result-ranking-modal').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">&times;</button></div>' +
-    '<div style="display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap">' +
-    '<button class="bfbtn active" onclick="loadRankingInModal('' + testId + '','',this)">Overall</button>' +
-    '<button class="bfbtn" onclick="loadRankingInModal('' + testId + '','11',this)">Class 11</button>' +
-    '<button class="bfbtn" onclick="loadRankingInModal('' + testId + '','12',this)">Class 12</button>' +
-    '<button class="bfbtn" onclick="loadRankingInModal('' + testId + '','dropper',this)">Dropper</button>' +
-    '</div>' +
-    '<div id="modal-ranking-content"><p style="color:var(--text-muted);text-align:center;padding:20px">Loading...</p></div>' +
+function showRankingModal(testId,batch){
+  var existing=document.getElementById('result-ranking-modal');if(existing)existing.remove();
+  var modal=document.createElement('div');modal.id='result-ranking-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.innerHTML='<div style="background:#fff;border-radius:12px;padding:24px;max-width:700px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 4px 24px rgba(0,0,0,0.2)">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
+    '<h3 style="font-size:16px;font-weight:700"><i class="fas fa-list-ol" style="color:var(--gold)"></i> Rankings</h3>'+
+    '<button onclick="document.getElementById(\'result-ranking-modal\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#888;line-height:1">&times;</button></div>'+
+    '<div style="display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap">'+
+    '<button class="bfbtn active" onclick="loadRankingInModal(\''+testId+'\',\'\',this)">Overall</button>'+
+    '<button class="bfbtn" onclick="loadRankingInModal(\''+testId+'\',\'11\',this)">Class 11</button>'+
+    '<button class="bfbtn" onclick="loadRankingInModal(\''+testId+'\',\'12\',this)">Class 12</button>'+
+    '<button class="bfbtn" onclick="loadRankingInModal(\''+testId+'\',\'dropper\',this)">Dropper</button>'+
+    '</div>'+
+    '<div id="modal-ranking-content"><p style="color:var(--text-muted);text-align:center;padding:16px">Loading...</p></div>'+
     '</div>';
   document.body.appendChild(modal);
-  modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
-  loadRankingInModal(testId, batch || '', null);
+  modal.onclick=function(e){if(e.target===modal)modal.remove();};
+  loadRankingInModal(testId,batch||'',null);
 }
 
-function loadRankingInModal(testId, batch, btn) {
-  if (btn) {
-    var parent = btn.parentElement;
-    if (parent) parent.querySelectorAll('.bfbtn').forEach(function(b){ b.classList.remove('active'); });
-    btn.classList.add('active');
-  }
-  var c = document.getElementById('modal-ranking-content'); if (!c) return;
-  c.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:16px">Loading...</p>';
-  api('/api/rankings/test/' + testId + '?batch=' + batch + '&limit=200').then(function(data) {
-    if (!data.rankings || !data.rankings.length) {
-      c.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:20px">No results for this filter.</p>';
-      return;
-    }
-    var bMap = {'11':'11th','12':'12th','dropper':'Drop'};
-    c.innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">' +
-      '<thead><tr style="background:#f0ebe0"><th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;border-bottom:1.5px solid #e5dfd0">Rank</th>' +
-      '<th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;border-bottom:1.5px solid #e5dfd0">Name</th>' +
-      '<th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;border-bottom:1.5px solid #e5dfd0">Email</th>' +
-      '<th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;border-bottom:1.5px solid #e5dfd0">Batch</th>' +
-      '<th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;border-bottom:1.5px solid #e5dfd0">Score</th>' +
-      '<th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;border-bottom:1.5px solid #e5dfd0">Time</th></tr></thead><tbody>' +
-      data.rankings.map(function(r, i) {
-        var m = Math.floor(r.timeTaken/60), s = r.timeTaken%60;
-        var isMe = S.user && r.userEmail === S.user.email;
-        return '<tr style="'+(isMe?'background:rgba(184,134,11,0.1);':i%2===0?'background:#fff':'background:#fafaf8')+'">' +
-          '<td style="padding:9px 12px;border-bottom:1px solid #e5dfd0;font-weight:700;color:'+(i===0?'#b8860b':i===1?'#888':i===2?'#cd7f32':'inherit')+'">' + (i+1) + (isMe?' 👤':'') + '</td>' +
-          '<td style="padding:9px 12px;border-bottom:1px solid #e5dfd0">' + esc(r.userName||'—') + '</td>' +
-          '<td style="padding:9px 12px;border-bottom:1px solid #e5dfd0;font-size:10px;color:#888">' + esc(r.userEmail||'—') + '</td>' +
-          '<td style="padding:9px 12px;border-bottom:1px solid #e5dfd0">' + (bMap[r.batch]||'—') + '</td>' +
-          '<td style="padding:9px 12px;border-bottom:1px solid #e5dfd0;font-family:monospace;font-weight:600;color:#b8860b">' + r.obtainedMarks + '/' + r.totalMarks + '</td>' +
-          '<td style="padding:9px 12px;border-bottom:1px solid #e5dfd0">' + m + 'm ' + s + 's</td></tr>';
-      }).join('') + '</tbody></table></div>' +
-      '<p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center">' + data.total + ' attempted &nbsp;|&nbsp; Your rank: <strong>#' + (data.myRank||'—') + '</strong></p>';
-  }).catch(function(err) { c.innerHTML = '<p style="color:var(--red);padding:16px">' + err.message + '</p>'; });
-}
-
-function viewTestAnalysisFromResult(testId) {
-  if (!testId) { toast('Analysis not available', 'info'); return; }
-  // Set currentTest._id so viewAnalysis works
-  if (!S.currentTest) S.currentTest = { _id: testId };
-  else S.currentTest._id = testId;
-  // Show analysis panel in result page
-  showPage('page-result');
-  viewAnalysis();
+function loadRankingInModal(testId,batch,btn){
+  if(btn){var p=btn.parentElement;if(p)p.querySelectorAll('.bfbtn').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');}
+  var c=document.getElementById('modal-ranking-content');if(!c)return;
+  api('/api/rankings/test/'+testId+'?batch='+batch+'&limit=200').then(function(data){
+    if(!data.rankings||!data.rankings.length){c.innerHTML='<p style="text-align:center;color:var(--text-muted);padding:16px">No results for this filter.</p>';return;}
+    var bMap={'11':'11th','12':'12th','dropper':'Drop'};
+    c.innerHTML='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'+
+      '<thead><tr style="background:#f0ebe0">'+['Rank','Name','Email','Coaching','Batch','Score','Time'].map(function(h){return'<th style="padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;border-bottom:1.5px solid #e5dfd0">'+h+'</th>';}).join('')+'</tr></thead><tbody>'+
+      data.rankings.map(function(r,i){var m=Math.floor(r.timeTaken/60),s=r.timeTaken%60;var isMe=S.user&&r.userEmail===S.user.email;
+        return '<tr style="'+(isMe?'background:rgba(184,134,11,0.1);':i%2===0?'':'background:#fafaf8')+'">'+
+        '<td style="padding:9px 10px;border-bottom:1px solid #e5dfd0;font-weight:700;color:'+(i===0?'#b8860b':i===1?'#888':i===2?'#cd7f32':'inherit')+'">'+(i+1)+(isMe?' 👤':'')+'</td>'+
+        '<td style="padding:9px 10px;border-bottom:1px solid #e5dfd0">'+esc(r.userName||'—')+'</td>'+
+        '<td style="padding:9px 10px;border-bottom:1px solid #e5dfd0;font-size:10px;color:#888">'+esc(r.userEmail||'—')+'</td>'+
+        '<td style="padding:9px 10px;border-bottom:1px solid #e5dfd0">'+esc(r.coachingName||'—')+'</td>'+
+        '<td style="padding:9px 10px;border-bottom:1px solid #e5dfd0">'+(bMap[r.batch]||'—')+'</td>'+
+        '<td style="padding:9px 10px;border-bottom:1px solid #e5dfd0;font-family:monospace;font-weight:600;color:#b8860b">'+r.obtainedMarks+'/'+r.totalMarks+'</td>'+
+        '<td style="padding:9px 10px;border-bottom:1px solid #e5dfd0">'+m+'m '+s+'s</td></tr>';
+      }).join('')+'</tbody></table></div>'+
+      '<p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center">'+data.total+' attempted | Your rank: <strong>#'+(data.myRank||'—')+'</strong></p>';
+  }).catch(function(err){c.innerHTML='<p style="color:var(--red);padding:12px">'+esc(err.message)+'</p>';});
 }
 
 function loadLeaderboard(batch){
   var c=document.getElementById('leaderboard-table');if(!c)return;
-  // Update filter buttons
-  ['all','11','12','dropper'].forEach(function(b){
-    var el=document.getElementById('lbf-'+b);
-    if(el)el.classList.toggle('active',(batch===''&&b==='all')||(batch===b));
-  });
+  ['all','11','12','dropper'].forEach(function(b){var el=document.getElementById('lbf-'+b);if(el)el.classList.toggle('active',(batch===''&&b==='all')||(batch===b));});
   api('/api/rankings/leaderboard?batch='+batch).then(function(data){
-    if(!data.length){c.innerHTML='<p style="text-align:center;color:var(--text-muted);padding:32px">No data yet.</p>';return;}
+    if(!data.length){c.innerHTML='<p style="text-align:center;color:var(--text-muted);padding:28px">No data yet.</p>';return;}
     var bMap={'11':'11th','12':'12th','dropper':'Drop'};
     c.innerHTML='<div style="overflow-x:auto"><table class="rank-table"><thead><tr><th>Rank</th><th>Name</th><th>Coaching</th><th>Batch</th><th>Tests</th><th>Total</th><th>Highest</th></tr></thead><tbody>'+
-      data.map(function(u,i){
-        return '<tr class="'+((['rank-1','rank-2','rank-3'][i])||'')+'"><td>'+(i+1)+'</td><td>'+esc(u.name)+'</td><td>'+esc(u.coachingName||'—')+'</td><td>'+(bMap[u.batch]||'—')+'</td><td>'+u.totalTests+'</td><td class="marks-cell">'+u.totalMarks+'</td><td class="marks-cell">'+u.highestMarks+'</td></tr>';
-      }).join('')+'</tbody></table></div>';
+      data.map(function(u,i){return'<tr class="'+((['rank-1','rank-2','rank-3'][i])||'')+'"><td>'+(i+1)+'</td><td>'+esc(u.name)+'</td><td>'+esc(u.coachingName||'—')+'</td><td>'+(bMap[u.batch]||'—')+'</td><td>'+u.totalTests+'</td><td class="marks-cell">'+u.totalMarks+'</td><td class="marks-cell">'+u.highestMarks+'</td></tr>';}).join('')+'</tbody></table></div>';
   }).catch(function(err){c.innerHTML='<p style="color:var(--red)">'+esc(err.message)+'</p>';});
 }
 
-function loadHomeGallery() {
-  fetch('/api/public/ad-images').then(function(r){return r.json();}).then(function(imgs){
-    var el=document.getElementById('home-gallery');
-    if(!el){return;}
-    if(!imgs.length){el.innerHTML='<p style="color:var(--text-muted);text-align:center;padding:24px">No gallery images yet.</p>';return;}
-    el.innerHTML=imgs.map(function(img){
-      var clickAttr=img.redirectUrl?'onclick="window.open(''+img.redirectUrl.replace(/'/g,"%27")+'','_blank','noopener')"':'';
-      return '<div class="gallery-img-wrap" '+clickAttr+' style="cursor:'+(img.redirectUrl?'pointer':'default')+'">' +
-        '<img src="'+img.imageData+'" alt="'+(img.title||'')+'" loading="lazy" style="width:100%;height:100%;object-fit:cover">' +
-        (img.title||img.description?'<div class="gallery-img-caption"><strong>'+escHtml(img.title||'')+'</strong>'+(img.description?'<span>'+escHtml(img.description)+'</span>':'')+'</div>':'') +
-        '</div>';
-    }).join('');
-  }).catch(function(){});
-}
 function loadStudentGallery(){
   var el=document.getElementById('student-gallery');if(!el)return;
-  el.innerHTML='<div class="skel" style="height:200px"></div><div class="skel" style="height:200px"></div><div class="skel" style="height:200px"></div>';
+  el.innerHTML='<div class="skel" style="height:180px"></div><div class="skel" style="height:180px;margin-top:8px"></div>';
   fetch('/api/public/ad-images').then(function(r){return r.json();}).then(function(imgs){
-    if(!imgs.length){el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text-muted)"><i class="fas fa-images" style="font-size:48px;display:block;margin-bottom:12px;opacity:0.3"></i>No images yet.</div>';return;}
+    if(!imgs||!imgs.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-images" style="font-size:40px;display:block;margin-bottom:10px;opacity:0.3"></i>No gallery images yet.</div>';return;}
     el.innerHTML=imgs.map(function(img){
-      var clickAttr=img.redirectUrl?'onclick="window.open(''+img.redirectUrl.replace(/'/g,"%27")+'','_blank','noopener')"':'';
-      return '<div class="gallery-img-wrap" '+clickAttr+' style="cursor:'+(img.redirectUrl?'pointer':'default')+'">' +
-        '<img src="'+img.imageData+'" alt="'+(img.title||'')+'" loading="lazy" style="width:100%;height:100%;object-fit:cover">' +
-        (img.title||img.description?'<div class="gallery-img-caption"><strong>'+escHtml(img.title||'')+'</strong>'+(img.description?'<span>'+escHtml(img.description)+'</span>':'')+'</div>':'') +
+      var click=img.redirectUrl?'onclick="window.open(\''+img.redirectUrl.replace(/'/g,'%27')+'\',\'_blank\',\'noopener\')" style="cursor:pointer"':'';
+      return '<div class="gallery-img-wrap" '+click+'><img src="'+img.imageData+'" alt="'+esc(img.title||'')+'" loading="lazy" style="width:100%;height:100%;object-fit:cover">'+
+        (img.title||img.description?'<div class="gallery-img-caption"><strong>'+esc(img.title||'')+'</strong>'+(img.description?'<span>'+esc(img.description)+'</span>':'')+'</div>':'')+
         '</div>';
     }).join('');
-  }).catch(function(err){el.innerHTML='<p style="color:#c53030;padding:20px">'+err.message+'</p>';});
+  }).catch(function(err){el.innerHTML='<p style="color:var(--red);padding:16px">'+esc(err.message)+'</p>';});
 }
+
 window.addEventListener('popstate',function(){
   if(window.location.pathname==='/')showPage('page-home');
 });
 </script>
-
 <script>
 (function(){var s=document.createElement('script');s.src='/socket.io/socket.io.js';s.async=true;document.body.appendChild(s);})();
-if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}
 </script>
 </body>
 </html>
