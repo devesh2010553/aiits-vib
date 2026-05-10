@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>AIITS — Ad Manager</title>
+<title>AIITS  Ad Manager</title>
 <meta name="robots" content="noindex,nofollow">
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3517811725655802" crossorigin="anonymous"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -95,7 +95,7 @@ textarea{resize:vertical}
 <div id="login-wrap" class="login-wrap">
   <div class="login-card">
     <div class="login-logo">AIITS</div>
-    <p class="login-sub">Ad Manager — Admin Access Only</p>
+    <p class="login-sub">Ad Manager  Admin Access Only</p>
     <div style="font-size:36px;color:var(--gold);text-align:center;margin-bottom:20px"><i class="fas fa-bullhorn"></i></div>
     <div class="fg"><label>Admin Email</label><input type="email" id="ad-email" placeholder="admin@email.com" onkeydown="if(event.key==='Enter')adLogin()"></div>
     <div class="fg">
@@ -113,7 +113,7 @@ textarea{resize:vertical}
 <div id="ad-manager" class="hidden">
   <div class="topbar">
     <div>
-      <div class="topbar-logo">AIITS — Ad Manager</div>
+      <div class="topbar-logo">AIITS  Ad Manager</div>
       <div style="font-size:10px;color:rgba(0,0,0,0.65)">Manage advertisements shown before tests</div>
     </div>
     <div class="topbar-right">
@@ -130,7 +130,7 @@ textarea{resize:vertical}
       <div class="upload-zone" onclick="document.getElementById('ad-img-input').click()">
         <i class="fas fa-image" style="font-size:28px;color:var(--gold);display:block;margin-bottom:8px"></i>
         <strong style="display:block;margin-bottom:3px">Click to upload ad image</strong>
-        <span style="font-size:11px;color:var(--text-muted)">JPG, PNG, WebP — max 8MB. This image shows to students before their test starts.</span>
+        <span style="font-size:11px;color:var(--text-muted)">JPG, PNG, WebP  max 8MB. This image shows to students before their test starts.</span>
       </div>
       <input type="file" id="ad-img-input" accept="image/*" style="display:none" onchange="previewAdImg(this)">
       <div id="ad-img-preview" style="display:none;margin-bottom:14px">
@@ -141,7 +141,7 @@ textarea{resize:vertical}
         <div class="fg"><label>Ad Title *</label><input type="text" id="ad-title" placeholder="e.g. JEE 2026 Batch Announcement"></div>
         <div class="fg"><label>Description (shown on image)</label><input type="text" id="ad-desc" placeholder="Short caption..."></div>
       </div>
-      <div class="fg"><label>Click URL (optional — students clicking image go here)</label><input type="url" id="ad-link" placeholder="https://... (leave blank if no link)"></div>
+      <div class="fg"><label>Click URL (optional  students clicking image go here)</label><input type="url" id="ad-link" placeholder="https://... (leave blank if no link)"></div>
       <div class="toggle-row">
         <label style="font-size:13px;cursor:pointer">Show in Home Page Gallery &amp; Student Gallery</label>
         <label class="tog"><input type="checkbox" id="ad-show-home" checked><span class="tog-sl"></span></label>
@@ -157,7 +157,7 @@ textarea{resize:vertical}
       <div class="card-title" style="color:var(--gold)"><i class="fas fa-info-circle"></i> How Advertisements Work</div>
       <div style="font-size:13px;color:var(--text-sec);line-height:1.8">
         <p><strong>1.</strong> Upload images here. They appear in the student home page gallery and student gallery page automatically if "Show in Home Page Gallery" is on.</p>
-        <p><strong>2.</strong> To show an ad before a specific test: go to <a href="/adminvibacdonlineaiits" style="color:var(--gold)">Main Admin → Create/Edit Test</a> → enable "Ad Page" → select which images to show.</p>
+        <p><strong>2.</strong> To show an ad before a specific test: go to <a href="/adminvibacdonlineaiits" style="color:var(--gold)">Main Admin  Create/Edit Test</a>  enable "Ad Page"  select which images to show.</p>
         <p><strong>3.</strong> When a student clicks "Attempt" on that test, they see the selected images as a slideshow (5 seconds each) before the test timer starts.</p>
         <p><strong>4.</strong> Clicking an image opens the Click URL you set. Use this for coaching updates, announcements, sponsor links etc.</p>
       </div>
@@ -226,7 +226,7 @@ function api(url,opts){
   });
 }
 
-// ── LOGIN ──────────────────────────────────────────────────────────────
+//  LOGIN 
 window.addEventListener('load', function() {
   // Check if already logged in as admin
   api('/api/auth/admin-me').then(function(r) {
@@ -260,7 +260,7 @@ function showManager() {
   loadAds();
 }
 
-// ── IMAGE PREVIEW ──────────────────────────────────────────────────────
+//  IMAGE PREVIEW 
 function previewAdImg(input) {
   _adFile = input.files[0];
   if (!_adFile) return;
@@ -278,7 +278,7 @@ function clearAdImgPreview() {
   var inp = document.getElementById('ad-img-input'); if (inp) inp.value = '';
 }
 
-// ── CREATE AD ─────────────────────────────────────────────────────────
+//  CREATE AD 
 function createAd() {
   var title = gv('ad-title');
   if (!title) { toast('Title is required', 'error'); return; }
@@ -317,7 +317,7 @@ function createAd() {
   });
 }
 
-// ── LOAD ADS ──────────────────────────────────────────────────────────
+//  LOAD ADS 
 function loadAds() {
   var g = document.getElementById('ads-grid'); if (!g) return;
   api('/api/admin/ad-images').then(function(imgs) {
@@ -376,7 +376,7 @@ function saveAdEdit() {
   }).catch(function(err) { toast(err.message, 'error'); });
 }
 
-// ── PREVIEW SLIDESHOW ─────────────────────────────────────────────────
+//  PREVIEW SLIDESHOW 
 function previewAdSlideshow() {
   api('/api/admin/ad-images').then(function(imgs) {
     var c = document.getElementById('preview-slides'); if (!c) return;
@@ -386,8 +386,8 @@ function previewAdSlideshow() {
         return '<div class="preview-slide">' +
           (img.imageData ? '<img src="' + img.imageData + '" alt="' + esc(img.title||'') + '">' : '<div style="height:120px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#888"><i class="fas fa-file-alt" style="font-size:24px"></i></div>') +
           '<div class="preview-caption"><strong>' + esc(img.title||'') + '</strong>' +
-          (img.description ? ' — ' + esc(img.description) : '') +
-          (img.redirectUrl ? ' <span style="color:var(--gold)">→ ' + esc(img.redirectUrl) + '</span>' : '') +
+          (img.description ? '  ' + esc(img.description) : '') +
+          (img.redirectUrl ? ' <span style="color:var(--gold)"> ' + esc(img.redirectUrl) + '</span>' : '') +
           '<span style="float:right;color:var(--text-muted)">Slide ' + (i+1) + ' (5 sec)</span></div></div>';
       }).join('') +
       '<p style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:8px">Students see these images cycling (5 sec each) before the test starts. Countdown runs in parallel.</p>';

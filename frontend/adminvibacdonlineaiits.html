@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>AIITS Admin — Vibrant Academy</title>
+<title>AIITS Admin  Vibrant Academy</title>
 <meta name="robots" content="noindex,nofollow">
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3517811725655802" crossorigin="anonymous"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -187,7 +187,7 @@ textarea{resize:vertical}
   <div class="login-wrap">
     <div class="login-card">
       <div class="login-logo">AIITS</div>
-      <p class="login-sub">Admin Portal — Vibrant Academy</p>
+      <p class="login-sub">Admin Portal  Vibrant Academy</p>
       <div class="shield-icon"><i class="fas fa-shield-alt"></i></div>
       <div class="fg"><label>Admin Email</label><input type="email" id="admin-email" placeholder="admin@email.com" onkeydown="if(event.key==='Enter')adminLogin()"></div>
       <div class="fg">
@@ -238,7 +238,7 @@ textarea{resize:vertical}
       <div class="del-results-card">
         <div class="fc-title" style="color:var(--red);margin-bottom:12px"><i class="fas fa-trash-alt"></i> Delete Test Results <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--text-muted)">(leaderboard archived automatically before deletion)</span></div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
-          <div class="fg" style="flex:1;min-width:180px;margin:0"><label>Select Test</label><select id="del-test-sel"><option value="">— Select a test —</option></select></div>
+          <div class="fg" style="flex:1;min-width:180px;margin:0"><label>Select Test</label><select id="del-test-sel"><option value=""> Select a test </option></select></div>
           <div class="fg" style="margin:0"><label>Batch</label>
             <select id="del-batch-sel" style="width:130px">
               <option value="all">All Batches</option>
@@ -249,7 +249,7 @@ textarea{resize:vertical}
           </div>
           <button class="btn btn-red btn-sm" onclick="deleteTestResults()"><i class="fas fa-trash"></i> Delete</button>
         </div>
-        <p style="font-size:11px;color:var(--text-muted);margin-top:8px"><i class="fas fa-info-circle"></i> Results deleted permanently. Leaderboard snapshot saved first — rankings remain visible.</p>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:8px"><i class="fas fa-info-circle"></i> Results deleted permanently. Leaderboard snapshot saved first  rankings remain visible.</p>
       </div>
     </div>
 
@@ -322,7 +322,7 @@ textarea{resize:vertical}
         <div class="img-upload-zone" onclick="document.getElementById('img-file-input').click()">
           <i class="fas fa-cloud-upload-alt" style="font-size:28px;color:var(--gold);display:block;margin-bottom:8px"></i>
           <strong style="display:block;margin-bottom:3px">Click to select image</strong>
-          <span style="font-size:11px;color:var(--text-muted)">JPG, PNG, WebP — max 8MB. Stored in MongoDB.</span>
+          <span style="font-size:11px;color:var(--text-muted)">JPG, PNG, WebP  max 8MB. Stored in MongoDB.</span>
         </div>
         <input type="file" id="img-file-input" accept="image/*" style="display:none" onchange="handleImgSelect(this)">
         <div id="img-preview-wrap" style="display:none;margin-bottom:12px">
@@ -332,7 +332,7 @@ textarea{resize:vertical}
           <div class="fg"><label>Title (optional)</label><input type="text" id="img-title" placeholder="e.g. Batch 2025-26 Toppers"></div>
           <div class="fg"><label>Description (optional)</label><input type="text" id="img-desc" placeholder="Short caption shown on image"></div>
         </div>
-        <div class="fg"><label>Click URL (optional — clicking image opens this)</label><input type="url" id="img-url" placeholder="https://... (leave blank if no link)"></div>
+        <div class="fg"><label>Click URL (optional  clicking image opens this)</label><input type="url" id="img-url" placeholder="https://... (leave blank if no link)"></div>
         <div class="toggle-row"><label style="font-size:13px">Show in Home Page Gallery &amp; Student Gallery</label><label class="tog"><input type="checkbox" id="img-show-home" checked><span class="tog-sl"></span></label></div>
         <button class="btn btn-gold" onclick="uploadImage()" id="img-upload-btn"><i class="fas fa-upload"></i> Upload Image</button>
       </div>
@@ -394,9 +394,9 @@ textarea{resize:vertical}
     <div id="atab-analytics" class="atab">
       <div class="dtab-header"><h3><i class="fas fa-chart-pie" style="color:var(--gold)"></i> Analytics &amp; Storage</h3></div>
       <div class="analytics-cards">
-        <div class="an-card"><i class="fas fa-file-alt"></i><span id="an-tests">—</span><label>Tests</label></div>
-        <div class="an-card"><i class="fas fa-users"></i><span id="an-students">—</span><label>Students</label></div>
-        <div class="an-card"><i class="fas fa-pen"></i><span id="an-attempts">—</span><label>Attempts</label></div>
+        <div class="an-card"><i class="fas fa-file-alt"></i><span id="an-tests"></span><label>Tests</label></div>
+        <div class="an-card"><i class="fas fa-users"></i><span id="an-students"></span><label>Students</label></div>
+        <div class="an-card"><i class="fas fa-pen"></i><span id="an-attempts"></span><label>Attempts</label></div>
       </div>
       <div class="storage-card">
         <div class="fc-title" style="color:var(--gold);margin-bottom:10px"><i class="fas fa-database"></i> MongoDB Storage (Free Tier: 512MB)</div>
@@ -421,7 +421,7 @@ textarea{resize:vertical}
 var S={allStudents:[],allStudentsBatch:'',qCounter:0,allImages:[]};
 var socket=null;
 
-// ── UTILS ────────────────────────────────────────────────────────────────
+//  UTILS 
 function showPage(id){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});var el=document.getElementById(id);if(el)el.classList.add('active');window.scrollTo(0,0);}
 function esc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function gv(id){var el=document.getElementById(id);return el?(el.value||'').trim():'';}
@@ -455,15 +455,15 @@ function api(url,opts){
   });
 }
 
-// ── INIT ─────────────────────────────────────────────────────────────────
+//  INIT 
 window.addEventListener('load', function() {
-  // Show login page IMMEDIATELY — never wait for API
+  // Show login page IMMEDIATELY  never wait for API
   showPage('page-login');
 
   // Check if already logged in (background, non-blocking)
   api('/api/auth/admin-me').then(function(r) {
     if (r && r.admin) { showPage('page-admin'); initAdmin(); }
-    // else stay on login — already shown
+    // else stay on login  already shown
   }).catch(function() { /* stay on login */ });
 
   setTimeout(function() {
@@ -471,7 +471,7 @@ window.addEventListener('load', function() {
   }, 1000);
 });
 
-// ── LOGIN / LOGOUT ────────────────────────────────────────────────────────
+//  LOGIN / LOGOUT 
 function adminLogin(){
   var email=gv('admin-email'),pass=gv('admin-password');
   if(!email||!pass){toast('Enter email and password','error');return;}
@@ -492,7 +492,7 @@ function adminLogout(){
 }
 function initAdmin(){
   loadAdminTests();loadAdminStats();loadAdminImages();loadDelTestSelect();
-  if(socket){try{socket.emit('join-admin');socket.on('cheat-alert',function(d){toast('⚠ Cheat: '+d.name+' ('+d.violations+' violations'+(d.autoSubmitted?' — AUTO SUBMITTED':'')+')','error',7000);});}catch(e){}}
+  if(socket){try{socket.emit('join-admin');socket.on('cheat-alert',function(d){toast(' Cheat: '+d.name+' ('+d.violations+' violations'+(d.autoSubmitted?'  AUTO SUBMITTED':'')+')','error',7000);});}catch(e){}}
 }
 function adminTab(tab){
   document.querySelectorAll('.atab').forEach(function(t){t.classList.remove('active');});
@@ -506,7 +506,7 @@ function adminTab(tab){
   else if(tab==='create-test')loadImagePicker();
 }
 
-// ── TESTS ─────────────────────────────────────────────────────────────────
+//  TESTS 
 function loadAdminTests(){
   var c=document.getElementById('admin-tests-list');if(!c)return;
   c.innerHTML='<div class="skel"></div><div class="skel"></div>';
@@ -535,7 +535,7 @@ function deleteTest(id){
 function loadDelTestSelect(){
   api('/api/admin/tests').then(function(tests){
     var sel=document.getElementById('del-test-sel');if(!sel)return;
-    sel.innerHTML='<option value="">— Select a test —</option>'+tests.map(function(t){return '<option value="'+t._id+'">'+esc(t.title)+' ('+esc(t.subject)+')</option>';}).join('');
+    sel.innerHTML='<option value=""> Select a test </option>'+tests.map(function(t){return '<option value="'+t._id+'">'+esc(t.title)+' ('+esc(t.subject)+')</option>';}).join('');
   }).catch(function(){});
 }
 function deleteTestResults(){
@@ -555,7 +555,7 @@ Leaderboard rankings will be preserved.'))return;
   }).catch(function(err){toast(err.message,'error');});
 }
 
-// ── CREATE / EDIT TEST ────────────────────────────────────────────────────
+//  CREATE / EDIT TEST 
 var _qImages={};  // { idx: base64 }
 var _oImages={};  // { 'idx-optIdx': base64 }
 
@@ -580,7 +580,7 @@ function loadImagePicker(){
 function buildImagePicker(imgs,selected){
   var c=document.getElementById('ad-image-picker');if(!c)return;
   if(!imgs||!imgs.length){
-    c.innerHTML='<span style="font-size:12px;color:var(--text-muted)">No images yet — upload in the Images tab first, then come back here.</span>';return;
+    c.innerHTML='<span style="font-size:12px;color:var(--text-muted)">No images yet  upload in the Images tab first, then come back here.</span>';return;
   }
   c.innerHTML=imgs.map(function(img){
     var isSel=selected.indexOf(img._id)!==-1;
@@ -615,7 +615,7 @@ function addQ(data){
     '<textarea id="qt-'+idx+'" rows="3" placeholder="Type your question here...">'+esc(data?data.questionText:'')+'</textarea>' +
     '<div class="q-attach-bar">' +
     '<label class="attach-btn"><i class="fas fa-paperclip"></i> Attach Question Image<input type="file" accept="image/*" onchange="attachQImg(this,'+idx+')"></label>' +
-    '<div id="qimg-preview-'+idx+'">'+(qImgData?'<div class="q-img-preview-wrap"><img src="'+qImgData+'" /><button type="button" onclick="removeQImg('+idx+')">×</button></div>':'')+'</div>' +
+    '<div id="qimg-preview-'+idx+'">'+(qImgData?'<div class="q-img-preview-wrap"><img src="'+qImgData+'" /><button type="button" onclick="removeQImg('+idx+')"></button></div>':'')+'</div>' +
     '</div></div>' +
     // Marks row
     '<div class="qi-marks-row">' +
@@ -628,7 +628,7 @@ function addQ(data){
     '<div class="fg"><label id="opts-lbl-'+idx+'">Options <span style="font-weight:400;font-size:11px;color:var(--text-muted)">'+(isMulti?'(check ALL that are correct)':'(select ONE correct answer)')+'</span></label>' +
     '<div class="opts-builder" id="ob-'+idx+'"></div></div>' +
     // Explanation
-    '<div class="fg"><label>Explanation (optional — shown after submission)</label><input type="text" id="qe-'+idx+'" placeholder="Brief explanation of correct answer" value="'+esc((data&&data.explanation)||'')+'"></div>' +
+    '<div class="fg"><label>Explanation (optional  shown after submission)</label><input type="text" id="qe-'+idx+'" placeholder="Brief explanation of correct answer" value="'+esc((data&&data.explanation)||'')+'"></div>' +
     '</div>';
   c.appendChild(div);
   buildOpts(idx,data&&data.options,optN,isMulti);
@@ -661,7 +661,7 @@ function buildOpts(idx,existing,n,isMulti){
         :'<input type="radio" id="qr-'+idx+'-'+i+'" name="qr-'+idx+'" value="'+i+'"'+(hasCorrect?' checked':'')+' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex-shrink:0">') +
       '<span style="color:var(--gold);font-weight:700;font-size:13px;min-width:18px">'+letters[i]+'</span>' +
       '<input type="text" id="qot-'+idx+'-'+i+'" placeholder="Option '+letters[i]+'" value="'+esc((existing&&existing[i]&&existing[i].text)||'')+'">' +
-      '<label for="qr-'+idx+'-'+i+'" class="opt-correct-lbl" style="color:var(--gold);font-size:11px;white-space:nowrap">✓ Correct</label>' +
+      '<label for="qr-'+idx+'-'+i+'" class="opt-correct-lbl" style="color:var(--gold);font-size:11px;white-space:nowrap"> Correct</label>' +
       '<label class="attach-btn" style="padding:4px 8px;font-size:11px;flex-shrink:0" title="Attach image to this option"><i class="fas fa-paperclip"></i><input type="file" accept="image/*" onchange="attachOptImg(this,'+idx+','+i+')" style="display:none"></label>' +
       '</div>' +
       (optImg?'<img class="opt-img-preview" id="oimg-preview-'+idx+'-'+i+'" src="'+optImg+'" alt="">':'<div id="oimg-preview-'+idx+'-'+i+'"></div>') +
@@ -676,7 +676,7 @@ function attachQImg(input,idx){
   r.onload=function(e){
     _qImages[idx]=e.target.result;
     var p=document.getElementById('qimg-preview-'+idx);
-    if(p)p.innerHTML='<div class="q-img-preview-wrap"><img src="'+e.target.result+'"><button type="button" onclick="removeQImg('+idx+')">×</button></div>';
+    if(p)p.innerHTML='<div class="q-img-preview-wrap"><img src="'+e.target.result+'"><button type="button" onclick="removeQImg('+idx+')"></button></div>';
   };
   r.readAsDataURL(file);
 }
@@ -786,7 +786,7 @@ function editTest(id){
 }
 function updateQCount(){setEl('q-count',document.querySelectorAll('.q-item').length);}
 
-// ── IMAGE MANAGER ─────────────────────────────────────────────────────────
+//  IMAGE MANAGER 
 var _imgFile=null;
 function handleImgSelect(input){
   _imgFile=input.files[0];
@@ -859,7 +859,7 @@ function deleteImage(id){
   api('/api/admin/ad-images/'+id,{method:'DELETE'}).then(function(){toast('Image deleted','info');loadAdminImages();}).catch(function(err){toast(err.message,'error');});
 }
 
-// ── STUDENTS ──────────────────────────────────────────────────────────────
+//  STUDENTS 
 function loadAdminStudents(){
   var c=document.getElementById('students-table');if(!c)return;
   api('/api/admin/students?limit=2000').then(function(r){
@@ -891,29 +891,29 @@ function renderStudents(list){
   c.innerHTML='<div style="overflow-x:auto"><table class="students-table"><thead><tr><th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Batch</th><th>Coaching</th><th>Father</th><th>WhatsApp</th><th>Tests</th><th>Total Marks</th><th>Joined</th></tr></thead><tbody>'+
     list.map(function(s,i){
       var bColors=(bClr[s.batch]||'#f0f0f0::#555').split('::');
-      return '<tr><td>'+(i+1)+'</td><td><strong>'+esc(s.name)+'</strong></td><td style="font-size:11px">'+esc(s.email)+'</td><td>'+esc(s.phone||'—')+'</td>' +
-        '<td><span style="padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;background:'+bColors[0]+';color:'+bColors[1]+'">'+esc(bMap[s.batch]||s.batch||'—')+'</span></td>' +
-        '<td>'+esc(s.coachingName||'—')+'</td><td>'+esc(s.fatherName||'—')+'</td><td>'+esc(s.whatsappNumber||'—')+'</td>' +
+      return '<tr><td>'+(i+1)+'</td><td><strong>'+esc(s.name)+'</strong></td><td style="font-size:11px">'+esc(s.email)+'</td><td>'+esc(s.phone||'')+'</td>' +
+        '<td><span style="padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;background:'+bColors[0]+';color:'+bColors[1]+'">'+esc(bMap[s.batch]||s.batch||'')+'</span></td>' +
+        '<td>'+esc(s.coachingName||'')+'</td><td>'+esc(s.fatherName||'')+'</td><td>'+esc(s.whatsappNumber||'')+'</td>' +
         '<td>'+( s.totalTests||0)+'</td><td class="marks-cell">'+(s.totalMarks||0)+'</td>' +
         '<td style="font-size:11px">'+new Date(s.createdAt).toLocaleDateString('en-IN')+'</td></tr>';
     }).join('')+'</tbody></table></div>';
 }
 
-// ── CHEAT LOGS ────────────────────────────────────────────────────────────
+//  CHEAT LOGS 
 function loadCheatLogs(){
   var c=document.getElementById('cheat-list');if(!c)return;
   api('/api/push/cheat-logs').then(function(logs){
     if(!logs.length){c.innerHTML='<p style="text-align:center;color:var(--text-muted);padding:28px">No cheating reports yet.</p>';return;}
     c.innerHTML=logs.map(function(l){
-      return '<div class="cheat-item"><h4><i class="fas fa-exclamation-triangle"></i> '+esc(l.userName)+' — '+l.violations+' violation(s) '+(l.autoSubmitted?'<span style="background:var(--red-light);color:var(--red);padding:1px 6px;border-radius:4px;font-size:10px">AUTO-SUBMITTED</span>':'')+'</h4>' +
+      return '<div class="cheat-item"><h4><i class="fas fa-exclamation-triangle"></i> '+esc(l.userName)+'  '+l.violations+' violation(s) '+(l.autoSubmitted?'<span style="background:var(--red-light);color:var(--red);padding:1px 6px;border-radius:4px;font-size:10px">AUTO-SUBMITTED</span>':'')+'</h4>' +
         '<p><i class="fas fa-envelope" style="margin-right:4px"></i>'+esc(l.userEmail)+'</p>' +
-        '<p><i class="fas fa-file-alt" style="margin-right:4px"></i>'+esc(l.testTitle||'—')+'</p>' +
-        '<p><i class="fas fa-info-circle" style="margin-right:4px"></i>'+esc(l.details||'—')+' &mdash; '+new Date(l.createdAt).toLocaleString('en-IN')+'</p></div>';
+        '<p><i class="fas fa-file-alt" style="margin-right:4px"></i>'+esc(l.testTitle||'')+'</p>' +
+        '<p><i class="fas fa-info-circle" style="margin-right:4px"></i>'+esc(l.details||'')+' &mdash; '+new Date(l.createdAt).toLocaleString('en-IN')+'</p></div>';
     }).join('');
   }).catch(function(err){c.innerHTML='<p style="color:var(--red)">'+esc(err.message)+'</p>';});
 }
 
-// ── ANALYTICS / STORAGE ───────────────────────────────────────────────────
+//  ANALYTICS / STORAGE 
 function loadAdminStats(){
   api('/api/admin/stats').then(function(s){
     setEl('an-tests',s.totalTests);
@@ -947,12 +947,12 @@ function loadAdminLeaderboard(batch){
     var bMap={'11':'11th','12':'12th','dropper':'Drop'};
     c.innerHTML='<div style="overflow-x:auto"><table class="rank-table"><thead><tr><th>Rank</th><th>Name</th><th>Email</th><th>Coaching</th><th>Batch</th><th>Tests</th><th>Total</th><th>Highest</th></tr></thead><tbody>'+
       data.slice(0,100).map(function(u,i){
-        return '<tr><td>'+(i+1)+'</td><td>'+esc(u.name)+'</td><td style="font-size:10px">'+esc(u.email||'—')+'</td><td>'+esc(u.coachingName||'—')+'</td><td>'+(bMap[u.batch]||'—')+'</td><td>'+u.totalTests+'</td><td class="marks-cell">'+u.totalMarks+'</td><td class="marks-cell">'+u.highestMarks+'</td></tr>';
+        return '<tr><td>'+(i+1)+'</td><td>'+esc(u.name)+'</td><td style="font-size:10px">'+esc(u.email||'')+'</td><td>'+esc(u.coachingName||'')+'</td><td>'+(bMap[u.batch]||'')+'</td><td>'+u.totalTests+'</td><td class="marks-cell">'+u.totalMarks+'</td><td class="marks-cell">'+u.highestMarks+'</td></tr>';
       }).join('')+'</tbody></table></div>';
   }).catch(function(){});
 }
 
-// ── PUSH / ANNOUNCE ───────────────────────────────────────────────────────
+//  PUSH / ANNOUNCE 
 function sendAnnouncement(){
   var title=gv('ann-title'),body=gv('ann-body'),url=gv('ann-url');
   if(!title||!body){toast('Title and message required','error');return;}
@@ -961,14 +961,14 @@ function sendAnnouncement(){
   }).catch(function(err){toast(err.message,'error');});
 }
 
-// ── EMAIL TEST ────────────────────────────────────────────────────────────
+//  EMAIL TEST 
 function testEmailConfig(){
   var addr=gv('test-email-addr');
   if(!addr){toast('Enter an email address','error');return;}
   var res=document.getElementById('email-test-result');
   if(res){res.style.display='block';res.style.background='#f0f0f0';res.innerHTML='<i class="fas fa-spinner fa-spin"></i> Sending test email...';}
   api('/api/auth/test-email?to='+encodeURIComponent(addr)).then(function(r){
-    if(res){res.style.background='#dcfce7';res.style.color='#15803d';res.innerHTML='<i class="fas fa-check-circle"></i> '+r.message+' — Check inbox (also check spam folder)';}
+    if(res){res.style.background='#dcfce7';res.style.color='#15803d';res.innerHTML='<i class="fas fa-check-circle"></i> '+r.message+'  Check inbox (also check spam folder)';}
     toast('Test email sent! Check inbox.','success');
   }).catch(function(err){
     if(res){res.style.background='#fee2e2';res.style.color='#c53030';res.innerHTML='<i class="fas fa-times-circle"></i> FAILED: '+(err.message||'Unknown error')+'<br><small>Check EMAIL_USER and EMAIL_PASS in Render environment variables.</small>';}

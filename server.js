@@ -5,7 +5,7 @@ const missing  = REQUIRED.filter(k => !process.env[k]);
 if (missing.length) { console.error('[STARTUP] Missing env vars:', missing.join(', ')); process.exit(1); }
 if (!process.env.JWT_SECRET) {
   process.env.JWT_SECRET = require('crypto').randomBytes(64).toString('hex');
-  console.warn('[STARTUP] JWT_SECRET not set — add to Render env vars!');
+  console.warn('[STARTUP] JWT_SECRET not set -- add to Render env vars!');
 }
 
 const express      = require('express');
@@ -22,35 +22,12 @@ const server = http.createServer(app);
 const io     = new Server(server, { cors: { origin: process.env.CLIENT_URL || '*', credentials: true } });
 app.set('io', io);
 
-// ── Security + CSP ────────────────────────────────────────────────────
+// Minimal security headers - NO CSP (AdSense needs dynamic domains we can't predict)
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options',        'SAMEORIGIN');
   res.setHeader('X-XSS-Protection',       '1; mode=block');
-  res.setHeader('Content-Security-Policy', [
-    "default-src 'self'",
-    // Inline scripts needed for single-file HTML + AdSense needs unsafe-inline
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' " +
-      "https://cdnjs.cloudflare.com " +
-      "https://pagead2.googlesyndication.com " +
-      "https://partner.googleadservices.com " +
-      "https://tpc.googlesyndication.com " +
-      "https://adservice.google.com " +
-      "https://ep1.adtrafficquality.google " +
-      "https://ep2.adtrafficquality.google " +
-      "https://securepubads.g.doubleclick.net " +
-      "https://www.googletagservices.com",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
-    "font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com",
-    "img-src 'self' data: blob: https:",
-    "connect-src 'self' wss: ws: https:",
-    // AdSense needs frames
-    "frame-src 'self' " +
-      "https://googleads.g.doubleclick.net " +
-      "https://tpc.googlesyndication.com " +
-      "https://www.google.com",
-    "worker-src 'self'"
-  ].join('; '));
+  // X-Frame-Options SAMEORIGIN allows AdSense iframes from google domains
+  res.setHeader('X-Frame-Options',        'SAMEORIGIN');
   next();
 });
 
@@ -78,7 +55,7 @@ app.use(express.static(path.join(__dirname, 'frontend'), {
   }
 }));
 
-// Utility
+// Utility / SEO
 app.get('/ping',   (_, res) => res.status(200).json({ status: 'ok', ts: Date.now() }));
 app.get('/health', (_, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
@@ -86,21 +63,23 @@ app.get('/robots.txt', (_, res) => {
   res.type('text/plain');
   res.send('User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: https://aiits-msc.onrender.com/sitemap.xml');
 });
-
 app.get('/sitemap.xml', (_, res) => {
   const base = 'https://aiits-msc.onrender.com';
   const d    = new Date().toISOString().split('T')[0];
   res.type('application/xml');
-  res.send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${base}/</loc><lastmod>${d}</lastmod><priority>1.0</priority></url><url><loc>${base}/register</loc><priority>0.8</priority></url><url><loc>${base}/login</loc><priority>0.7</priority></url></urlset>`);
+  res.send('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>' + base + '/</loc><lastmod>' + d + '</lastmod><priority>1.0</priority></url><url><loc>' + base + '/register</loc><priority>0.8</priority></url><url><loc>' + base + '/login</loc><priority>0.7</priority></url></urlset>');
 });
 
-// Secret pages — no .html in URL
+// favicon - return empty to stop 404 errors
+app.get('/favicon.ico', (_, res) => res.status(204).end());
+
+// Secret pages
 app.get('/adminvibacdonlineaiits', (_, res) =>
   res.sendFile(path.join(__dirname, 'frontend', 'adminvibacdonlineaiits.html')));
 app.get('/ad856eyqafggg', (_, res) =>
   res.sendFile(path.join(__dirname, 'frontend', 'ad856eyqafggg.html')));
 
-// API
+// API routes
 app.use('/api/auth',     require('./backend/routes/auth'));
 app.use('/api/admin',    require('./backend/routes/admin'));
 app.use('/api/tests',    require('./backend/routes/tests'));
@@ -108,7 +87,7 @@ app.use('/api/results',  require('./backend/routes/results'));
 app.use('/api/rankings', require('./backend/routes/rankings'));
 app.use('/api/push',     require('./backend/routes/push'));
 
-// Public gallery (no auth)
+// Public gallery (no auth needed)
 app.get('/api/public/ad-images', async (req, res) => {
   try {
     const AdImage = require('./backend/models/AdImage');
