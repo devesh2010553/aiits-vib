@@ -411,6 +411,7 @@ textarea{resize:vertical}
           <button class="bfbtn" id="alf-dropper" onclick="loadAdminLeaderboard('dropper')">Dropper</button>
         </div>
       </div>
+      <div id="sheet-stats" style="margin-bottom:12px"></div>
       <div id="admin-leaderboard"></div>
     </div>
 
@@ -421,30 +422,18 @@ textarea{resize:vertical}
 var S={allStudents:[],allStudentsBatch:'',qCounter:0,allImages:[]};
 var socket=null;
 
-//  UTILS 
+// UTILS
 function showPage(id){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});var el=document.getElementById(id);if(el)el.classList.add('active');window.scrollTo(0,0);}
 function esc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function gv(id){var el=document.getElementById(id);return el?(el.value||'').trim():'';}
 function setEl(id,v){var el=document.getElementById(id);if(el)el.textContent=v;}
-function togglePw(id, btn) {
-  var el = document.getElementById(id);
-  if (!el) return;
-  if (el.type === 'password') {
-    el.type = 'text';
-    var i = btn.querySelector('i');
-    if (i) i.className = 'fas fa-eye-slash';
-  } else {
-    el.type = 'password';
-    var i2 = btn.querySelector('i');
-    if (i2) i2.className = 'fas fa-eye';
-  }
-}
+function togglePw(id,btn){var el=document.getElementById(id);if(!el)return;var showing=(el.type==='text');el.type=showing?'password':'text';var icon=btn.querySelector('i');if(icon)icon.className=showing?'fas fa-eye':'fas fa-eye-slash';}
 function toast(msg,type,dur){
   type=type||'info';dur=dur||3500;
   var c=document.getElementById('toast-container');if(!c)return;
   var icons={success:'fa-check-circle',error:'fa-exclamation-circle',info:'fa-info-circle'};
   var t=document.createElement('div');t.className='toast '+type;
-  t.innerHTML='<i class="fas '+(icons[type]||icons.info)+'" style="color:inherit;font-size:15px"></i><span>'+msg+'</span>';
+  t.innerHTML='<i class="fas '+(icons[type]||icons.info)+'"></i><span>'+esc(msg)+'</span>';
   c.appendChild(t);
   setTimeout(function(){t.style.opacity='0';t.style.transform='translateX(110%)';t.style.transition='0.3s';setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},300);},dur);
 }
@@ -455,31 +444,24 @@ function api(url,opts){
   });
 }
 
-//  INIT 
-window.addEventListener('load', function() {
-  // Show login page IMMEDIATELY  never wait for API
+// INIT
+window.addEventListener('load',function(){
   showPage('page-login');
-
-  // Check if already logged in (background, non-blocking)
-  api('/api/auth/admin-me').then(function(r) {
-    if (r && r.admin) { showPage('page-admin'); initAdmin(); }
-    // else stay on login  already shown
-  }).catch(function() { /* stay on login */ });
-
-  setTimeout(function() {
-    try { if (typeof io !== 'undefined') socket = io({ withCredentials: true }); } catch(e) {}
-  }, 1000);
+  api('/api/auth/admin-me').then(function(r){
+    if(r&&r.admin){showPage('page-admin');initAdmin();}
+  }).catch(function(){});
+  setTimeout(function(){try{if(typeof io!=='undefined')socket=io({withCredentials:true});}catch(e){}},1000);
 });
 
-//  LOGIN / LOGOUT 
+// AUTH
 function adminLogin(){
   var email=gv('admin-email'),pass=gv('admin-password');
   if(!email||!pass){toast('Enter email and password','error');return;}
-  var btn=document.getElementById('login-btn');btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Logging in...';
+  var btn=document.getElementById('login-btn');
+  btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Logging in...';
   api('/api/auth/admin-login',{method:'POST',body:JSON.stringify({email:email,password:pass})}).then(function(){
     btn.disabled=false;btn.innerHTML='<i class="fas fa-lock-open"></i> Login';
-    showPage('page-admin');initAdmin();
-    toast('Welcome, Admin!','success');
+    showPage('page-admin');initAdmin();toast('Welcome, Admin!','success');
   }).catch(function(err){
     btn.disabled=false;btn.innerHTML='<i class="fas fa-lock-open"></i> Login';
     toast(err.message||'Invalid credentials','error');
@@ -487,12 +469,11 @@ function adminLogin(){
 }
 function adminLogout(){
   api('/api/auth/logout',{method:'POST'}).catch(function(){});
-  showPage('page-login');
-  toast('Logged out','info');
+  showPage('page-login');toast('Logged out','info');
 }
 function initAdmin(){
   loadAdminTests();loadAdminStats();loadAdminImages();loadDelTestSelect();
-  if(socket){try{socket.emit('join-admin');socket.on('cheat-alert',function(d){toast(' Cheat: '+d.name+' ('+d.violations+' violations'+(d.autoSubmitted?'  AUTO SUBMITTED':'')+')','error',7000);});}catch(e){}}
+  if(socket){try{socket.emit('join-admin');socket.on('cheat-alert',function(d){toast('Cheat: '+d.name+' ('+d.violations+' violations'+(d.autoSubmitted?' AUTO SUBMITTED':'')+')','error',7000);});}catch(e){}}
 }
 function adminTab(tab){
   document.querySelectorAll('.atab').forEach(function(t){t.classList.remove('active');});
@@ -506,94 +487,94 @@ function adminTab(tab){
   else if(tab==='create-test')loadImagePicker();
 }
 
-//  TESTS 
+// TESTS
 function loadAdminTests(){
   var c=document.getElementById('admin-tests-list');if(!c)return;
   c.innerHTML='<div class="skel"></div><div class="skel"></div>';
   api('/api/admin/tests').then(function(tests){
-    if(!tests.length){c.innerHTML='<p style="text-align:center;color:var(--text-muted);padding:28px">No tests yet. Create your first!</p>';return;}
-    c.innerHTML=tests.map(function(t){
+    if(!tests.length){c.innerHTML='<p style="text-align:center;color:#888;padding:28px">No tests yet. Create your first!</p>';return;}
+    var html='';
+    tests.forEach(function(t){
       var tb=(t.targetBatches&&t.targetBatches.length)?t.targetBatches.join(', '):'All batches';
-      return '<div class="admin-test-item"><div style="flex:1;min-width:0"><div class="ati-title">'+esc(t.title)+'</div>' +
-        '<div class="ati-meta"><span>'+esc(t.subject)+'</span><span>'+esc(t.topic)+'</span>' +
-        '<span>'+(t.questions?t.questions.length:0)+'Q</span><span>'+t.duration+'min</span>' +
-        '<span>'+(t.attemptCount||0)+' attempts</span><span>'+tb+'</span>' +
-        '<span><span class="pub-dot '+(t.isPublished?'':'draft-dot')+'"></span>'+(t.isPublished?'Published':'Draft')+'</span></div></div>' +
-        '<div class="ati-actions">' +
-        '<button class="btn btn-outline btn-sm" onclick="editTest(''+t._id+'')"><i class="fas fa-edit"></i> Edit</button>' +
-        '<button class="btn '+(t.isPublished?'btn-ghost':'btn-gold')+' btn-sm" onclick="togglePub(''+t._id+'')"><i class="fas fa-'+(t.isPublished?'eye-slash':'globe')+'"></i> '+(t.isPublished?'Unpublish':'Publish')+'</button>' +
-        '<button class="btn btn-red btn-sm" onclick="deleteTest(''+t._id+'')"><i class="fas fa-trash"></i></button>' +
-        '</div></div>';
-    }).join('');
-  }).catch(function(err){c.innerHTML='<p style="color:var(--red);padding:16px">'+esc(err.message)+'</p>';});
+      html+='<div class="admin-test-item">';
+      html+='<div style="flex:1;min-width:0"><div class="ati-title">'+esc(t.title)+'</div>';
+      html+='<div class="ati-meta"><span>'+esc(t.subject)+'</span><span>'+esc(t.topic)+'</span>';
+      html+='<span>'+(t.questions?t.questions.length:0)+'Q</span><span>'+t.duration+'min</span>';
+      html+='<span>'+(t.attemptCount||0)+' attempts</span><span>'+esc(tb)+'</span>';
+      html+='<span><span class="pub-dot '+(t.isPublished?'':'draft-dot')+'"></span>'+(t.isPublished?'Published':'Draft')+'</span></div></div>';
+      html+='<div class="ati-actions">';
+      html+='<button class="btn btn-outline btn-sm" onclick="editTest(\''+t._id+'\')"><i class="fas fa-edit"></i> Edit</button>';
+      html+='<button class="btn '+(t.isPublished?'btn-ghost':'btn-gold')+' btn-sm" onclick="togglePub(\''+t._id+'\')"><i class="fas fa-'+(t.isPublished?'eye-slash':'globe')+'"></i> '+(t.isPublished?'Unpublish':'Publish')+'</button>';
+      html+='<button class="btn btn-red btn-sm" onclick="deleteTest(\''+t._id+'\')"><i class="fas fa-trash"></i></button>';
+      html+='</div></div>';
+    });
+    c.innerHTML=html;
+  }).catch(function(err){c.innerHTML='<p style="color:#c53030;padding:16px">'+esc(err.message)+'</p>';});
 }
-function togglePub(id){api('/api/admin/tests/'+id+'/publish',{method:'PATCH'}).then(function(r){toast(r.isPublished?'Published!':'Unpublished','success');loadAdminTests();}).catch(function(err){toast(err.message,'error');});}
+function togglePub(id){
+  api('/api/admin/tests/'+id+'/publish',{method:'PATCH'}).then(function(r){
+    toast(r.isPublished?'Published!':'Unpublished','success');loadAdminTests();
+  }).catch(function(err){toast(err.message,'error');});
+}
 function deleteTest(id){
   if(!confirm('Delete this test and ALL its results permanently?'))return;
-  api('/api/admin/tests/'+id,{method:'DELETE'}).then(function(){toast('Deleted','info');loadAdminTests();loadDelTestSelect();}).catch(function(err){toast(err.message,'error');});
+  api('/api/admin/tests/'+id,{method:'DELETE'}).then(function(){
+    toast('Deleted','info');loadAdminTests();loadDelTestSelect();
+  }).catch(function(err){toast(err.message,'error');});
 }
 function loadDelTestSelect(){
   api('/api/admin/tests').then(function(tests){
     var sel=document.getElementById('del-test-sel');if(!sel)return;
-    sel.innerHTML='<option value=""> Select a test </option>'+tests.map(function(t){return '<option value="'+t._id+'">'+esc(t.title)+' ('+esc(t.subject)+')</option>';}).join('');
+    sel.innerHTML='<option value="">Select a test</option>'+tests.map(function(t){return'<option value="'+t._id+'">'+esc(t.title)+' ('+esc(t.subject)+')</option>';}).join('');
   }).catch(function(){});
 }
 function deleteTestResults(){
   var sel=document.getElementById('del-test-sel');
   var bSel=document.getElementById('del-batch-sel');
-  var testId=sel&&sel.value;
-  var batch=(bSel&&bSel.value)||'all';
+  var testId=sel&&sel.value;var batch=(bSel&&bSel.value)||'all';
   if(!testId){toast('Select a test first','error');return;}
   var testName=sel.options[sel.selectedIndex]&&sel.options[sel.selectedIndex].text||'';
   var bLabel={'all':'all batches','11':'Class 11','12':'Class 12','dropper':'Dropper'}[batch]||batch;
-  if(!confirm('Archive leaderboard and delete results for "'+testName+'" ('+bLabel+')?
-
-Leaderboard rankings will be preserved.'))return;
+  if(!confirm('Archive leaderboard and delete results for "'+testName+'" ('+bLabel+')?'))return;
   api('/api/admin/tests/'+testId+'/results?batch='+batch,{method:'DELETE'}).then(function(r){
-    toast('Deleted '+r.deleted+' results. Leaderboard archived.','success');
-    loadAdminStats();
+    toast('Deleted '+r.deleted+' results. Leaderboard archived.','success');loadAdminStats();
   }).catch(function(err){toast(err.message,'error');});
 }
 
-//  CREATE / EDIT TEST 
-var _qImages={};  // { idx: base64 }
-var _oImages={};  // { 'idx-optIdx': base64 }
+// CREATE/EDIT TEST
+var _qImages={};
+var _oImages={};
 
 function resetTestForm(){
   document.getElementById('edit-test-id').value='';
-  document.getElementById('ct-label').innerHTML='<i class="fas fa-plus-circle" style="color:var(--gold)"></i> Create New Test';
+  document.getElementById('ct-label').innerHTML='<i class="fas fa-plus-circle" style="color:#b8860b"></i> Create New Test';
   ['ct-title','ct-subject','ct-topic','ct-desc','ct-ad-url'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   var dur=document.getElementById('ct-duration');if(dur)dur.value='';
   var tog=document.getElementById('ct-ad-on');if(tog)tog.checked=false;
   ['batch-11','batch-12','batch-drop'].forEach(function(id){var el=document.getElementById(id);if(el)el.checked=false;});
   document.getElementById('qs-container').innerHTML='';
-  S.qCounter=0;_qImages={};_oImages={};updateQCount();
-  loadImagePicker();
+  S.qCounter=0;_qImages={};_oImages={};updateQCount();loadImagePicker();
 }
 
 function loadImagePicker(){
   api('/api/admin/ad-images').then(function(imgs){
-    S.allImages=imgs;
-    buildImagePicker(imgs,[]);
+    S.allImages=imgs;buildImagePicker(imgs,[]);
   }).catch(function(){});
 }
 function buildImagePicker(imgs,selected){
   var c=document.getElementById('ad-image-picker');if(!c)return;
-  if(!imgs||!imgs.length){
-    c.innerHTML='<span style="font-size:12px;color:var(--text-muted)">No images yet  upload in the Images tab first, then come back here.</span>';return;
-  }
-  c.innerHTML=imgs.map(function(img){
+  if(!imgs||!imgs.length){c.innerHTML='<span style="font-size:12px;color:#888">No images yet. Upload in Images tab first.</span>';return;}
+  var html='';
+  imgs.forEach(function(img){
     var isSel=selected.indexOf(img._id)!==-1;
-    return '<label class="img-picker-item"><input type="checkbox" name="ad-img-sel" value="'+img._id+'" style="display:none"'+(isSel?' checked':'')+'>' +
-      '<img src="'+img.imageData+'" style="width:72px;height:54px;object-fit:cover;border-radius:5px;border:2px solid '+(isSel?'var(--gold)':'transparent')+';transition:border 0.2s">' +
-      '<span>'+esc(img.title||'image')+'</span></label>';
-  }).join('');
-  // Toggle border on click
+    html+='<label class="img-picker-item">';
+    html+='<input type="checkbox" name="ad-img-sel" value="'+img._id+'" style="display:none"'+(isSel?' checked':'')+'>';
+    html+='<img src="'+img.imageData+'" style="width:72px;height:54px;object-fit:cover;border-radius:5px;border:2px solid '+(isSel?'#b8860b':'transparent')+';transition:border 0.2s">';
+    html+='<span>'+esc(img.title||'image')+'</span></label>';
+  });
+  c.innerHTML=html;
   c.querySelectorAll('input[type=checkbox]').forEach(function(cb){
-    cb.addEventListener('change',function(){
-      var img=this.parentElement&&this.parentElement.querySelector('img');
-      if(img)img.style.borderColor=this.checked?'var(--gold)':'transparent';
-    });
+    cb.addEventListener('change',function(){var img=this.parentElement&&this.parentElement.querySelector('img');if(img)img.style.borderColor=this.checked?'#b8860b':'transparent';});
   });
 }
 
@@ -605,40 +586,45 @@ function addQ(data){
   var isMulti=(data&&data.isMultiChoice)||false;
   var qImgData=(data&&data.questionImage)||'';
   if(qImgData)_qImages[idx]=qImgData;
-  var div=document.createElement('div');div.className='q-item';div.id='qi-'+idx;
-  div.innerHTML=
-    '<div class="qi-top"><span class="qi-num">Question '+n+'</span>' +
-    '<button type="button" class="btn btn-red btn-sm" onclick="this.closest('.q-item').remove();updateQCount()"><i class="fas fa-trash"></i> Remove</button></div>' +
-    '<div class="qi-body">' +
-    // Question text
-    '<div class="fg"><label>Question Text <span style="font-weight:400;opacity:0.7">(type and/or attach image)</span></label>' +
-    '<textarea id="qt-'+idx+'" rows="3" placeholder="Type your question here...">'+esc(data?data.questionText:'')+'</textarea>' +
-    '<div class="q-attach-bar">' +
-    '<label class="attach-btn"><i class="fas fa-paperclip"></i> Attach Question Image<input type="file" accept="image/*" onchange="attachQImg(this,'+idx+')"></label>' +
-    '<div id="qimg-preview-'+idx+'">'+(qImgData?'<div class="q-img-preview-wrap"><img src="'+qImgData+'" /><button type="button" onclick="removeQImg('+idx+')"></button></div>':'')+'</div>' +
-    '</div></div>' +
-    // Marks row
-    '<div class="qi-marks-row">' +
-    '<div class="fg"><label>Marks (+)</label><input type="number" id="qm-'+idx+'" value="'+((data&&data.marks)||4)+'" min="0"></div>' +
-    '<div class="fg"><label>Negative (-)</label><input type="number" id="qn-'+idx+'" value="'+((data&&data.negativeMarks)||1)+'" min="0"></div>' +
-    '<div class="fg"><label>No. of Options</label><select id="qo-'+idx+'" onchange="rebuildOpts('+idx+')"><option value="2"'+(optN===2?' selected':'')+'>2 Options</option><option value="3"'+(optN===3?' selected':'')+'>3 Options</option><option value="4"'+(optN===4?' selected':'')+'>4 Options</option><option value="5"'+(optN===5?' selected':'')+'>5 Options</option></select></div>' +
-    '<div class="fg"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="qmc-'+idx+'" style="width:auto;accent-color:var(--gold);cursor:pointer"'+(isMulti?' checked':'')+' onchange="onMultiChange('+idx+',this.checked)"> Multi-Choice</label><div style="font-size:10px;color:var(--text-muted);margin-top:3px" id="mc-hint-'+idx+'">'+(isMulti?'Multiple correct answers':'Single correct answer')+'</div></div>' +
-    '</div>' +
-    // Options
-    '<div class="fg"><label id="opts-lbl-'+idx+'">Options <span style="font-weight:400;font-size:11px;color:var(--text-muted)">'+(isMulti?'(check ALL that are correct)':'(select ONE correct answer)')+'</span></label>' +
-    '<div class="opts-builder" id="ob-'+idx+'"></div></div>' +
-    // Explanation
-    '<div class="fg"><label>Explanation (optional  shown after submission)</label><input type="text" id="qe-'+idx+'" placeholder="Brief explanation of correct answer" value="'+esc((data&&data.explanation)||'')+'"></div>' +
-    '</div>';
+
+  var div=document.createElement('div');
+  div.className='q-item';div.id='qi-'+idx;
+
+  var html='<div class="qi-top"><span class="qi-num">Question '+n+'</span>';
+  html+='<button type="button" class="btn btn-red btn-sm" onclick="this.closest(\'.q-item\').remove();updateQCount()"><i class="fas fa-trash"></i> Remove</button></div>';
+  html+='<div class="qi-body">';
+  // Question text + image
+  html+='<div class="fg"><label>Question Text <span style="font-weight:400;opacity:0.7">(type and/or attach image)</span></label>';
+  html+='<textarea id="qt-'+idx+'" rows="3" placeholder="Type question here...">'+esc(data?data.questionText||'':'')+'</textarea>';
+  html+='<div class="q-attach-bar">';
+  html+='<label class="attach-btn"><i class="fas fa-paperclip"></i> Attach Question Image<input type="file" accept="image/*" onchange="attachQImg(this,'+idx+')" style="display:none"></label>';
+  html+='<div id="qimg-preview-'+idx+'">'+(qImgData?'<div class="q-img-preview-wrap"><img src="'+qImgData+'" /><button type="button" onclick="removeQImg('+idx+')">x</button></div>':'')+'</div>';
+  html+='</div></div>';
+  // Marks row
+  html+='<div class="qi-marks-row">';
+  html+='<div class="fg"><label>Marks (+)</label><input type="number" id="qm-'+idx+'" value="'+((data&&data.marks)||4)+'" min="0"></div>';
+  html+='<div class="fg"><label>Negative (-)</label><input type="number" id="qn-'+idx+'" value="'+((data&&data.negativeMarks)||1)+'" min="0"></div>';
+  html+='<div class="fg"><label>Options</label><select id="qo-'+idx+'" onchange="rebuildOpts('+idx+')">';
+  [2,3,4,5].forEach(function(v){html+='<option value="'+v+'"'+(optN===v?' selected':'')+'>'+v+' Options</option>';});
+  html+='</select></div>';
+  html+='<div class="fg"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="qmc-'+idx+'" style="width:auto;accent-color:#b8860b;cursor:pointer"'+(isMulti?' checked':'')+' onchange="onMultiChange('+idx+',this.checked)"> Multi-Choice</label></div>';
+  html+='</div>';
+  // Options
+  html+='<div class="fg"><label id="opts-lbl-'+idx+'">Options <span style="font-weight:400;font-size:11px;color:#888">'+(isMulti?'(check ALL correct)':'(select ONE correct)')+'</span></label>';
+  html+='<div class="opts-builder" id="ob-'+idx+'"></div></div>';
+  // Explanation
+  html+='<div class="fg"><label>Explanation (optional)</label><input type="text" id="qe-'+idx+'" placeholder="Brief explanation" value="'+esc((data&&data.explanation)||'')+'"></div>';
+  html+='</div>';
+
+  div.innerHTML=html;
   c.appendChild(div);
   buildOpts(idx,data&&data.options,optN,isMulti);
   updateQCount();
 }
 
 function onMultiChange(idx,isMulti){
-  var hint=document.getElementById('mc-hint-'+idx);if(hint)hint.textContent=isMulti?'Multiple correct answers':'Single correct answer';
   var lbl=document.getElementById('opts-lbl-'+idx);
-  if(lbl)lbl.innerHTML='Options <span style="font-weight:400;font-size:11px;color:var(--text-muted)">'+(isMulti?'(check ALL that are correct)':'(select ONE correct answer)')+'</span>';
+  if(lbl)lbl.innerHTML='Options <span style="font-weight:400;font-size:11px;color:#888">'+(isMulti?'(check ALL correct)':'(select ONE correct)')+'</span>';
   rebuildOpts(idx);
 }
 function rebuildOpts(idx){
@@ -654,18 +640,20 @@ function buildOpts(idx,existing,n,isMulti){
     var hasCorrect=existing&&existing[i]&&existing[i].isCorrect;
     var optImg=(existing&&existing[i]&&existing[i].imageData)||(_oImages[idx+'-'+i])||'';
     if(optImg)_oImages[idx+'-'+i]=optImg;
-    html+='<div class="opt-row" id="opt-row-'+idx+'-'+i+'">' +
-      '<div class="opt-row-top">' +
-      (isMulti
-        ?'<input type="checkbox" id="qr-'+idx+'-'+i+'" name="qr-'+idx+'"'+(hasCorrect?' checked':'')+' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex-shrink:0">'
-        :'<input type="radio" id="qr-'+idx+'-'+i+'" name="qr-'+idx+'" value="'+i+'"'+(hasCorrect?' checked':'')+' style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex-shrink:0">') +
-      '<span style="color:var(--gold);font-weight:700;font-size:13px;min-width:18px">'+letters[i]+'</span>' +
-      '<input type="text" id="qot-'+idx+'-'+i+'" placeholder="Option '+letters[i]+'" value="'+esc((existing&&existing[i]&&existing[i].text)||'')+'">' +
-      '<label for="qr-'+idx+'-'+i+'" class="opt-correct-lbl" style="color:var(--gold);font-size:11px;white-space:nowrap"> Correct</label>' +
-      '<label class="attach-btn" style="padding:4px 8px;font-size:11px;flex-shrink:0" title="Attach image to this option"><i class="fas fa-paperclip"></i><input type="file" accept="image/*" onchange="attachOptImg(this,'+idx+','+i+')" style="display:none"></label>' +
-      '</div>' +
-      (optImg?'<img class="opt-img-preview" id="oimg-preview-'+idx+'-'+i+'" src="'+optImg+'" alt="">':'<div id="oimg-preview-'+idx+'-'+i+'"></div>') +
-      '</div>';
+    html+='<div class="opt-row" id="opt-row-'+idx+'-'+i+'"><div class="opt-row-top">';
+    if(isMulti){
+      html+='<input type="checkbox" id="qr-'+idx+'-'+i+'" name="qr-'+idx+'"'+(hasCorrect?' checked':'')+' style="width:16px;height:16px;accent-color:#b8860b;cursor:pointer;flex-shrink:0">';
+    } else {
+      html+='<input type="radio" id="qr-'+idx+'-'+i+'" name="qr-'+idx+'" value="'+i+'"'+(hasCorrect?' checked':'')+' style="width:16px;height:16px;accent-color:#b8860b;cursor:pointer;flex-shrink:0">';
+    }
+    html+='<span style="color:#b8860b;font-weight:700;font-size:13px;min-width:18px">'+letters[i]+'</span>';
+    html+='<input type="text" id="qot-'+idx+'-'+i+'" placeholder="Option '+letters[i]+'" value="'+esc((existing&&existing[i]&&existing[i].text)||'')+'">';
+    html+='<label for="qr-'+idx+'-'+i+'" style="font-size:11px;color:#888;white-space:nowrap;cursor:pointer">Correct</label>';
+    html+='<label class="attach-btn" style="padding:4px 8px;font-size:11px;flex-shrink:0" title="Attach image"><i class="fas fa-paperclip"></i><input type="file" accept="image/*" onchange="attachOptImg(this,'+idx+','+i+')" style="display:none"></label>';
+    html+='</div>';
+    if(optImg)html+='<img class="opt-img-preview" id="oimg-preview-'+idx+'-'+i+'" src="'+optImg+'" alt="">';
+    else html+='<div id="oimg-preview-'+idx+'-'+i+'"></div>';
+    html+='</div>';
   }
   c.innerHTML=html;
 }
@@ -676,27 +664,22 @@ function attachQImg(input,idx){
   r.onload=function(e){
     _qImages[idx]=e.target.result;
     var p=document.getElementById('qimg-preview-'+idx);
-    if(p)p.innerHTML='<div class="q-img-preview-wrap"><img src="'+e.target.result+'"><button type="button" onclick="removeQImg('+idx+')"></button></div>';
+    if(p)p.innerHTML='<div class="q-img-preview-wrap"><img src="'+e.target.result+'"><button type="button" onclick="removeQImg('+idx+')">x</button></div>';
   };
   r.readAsDataURL(file);
 }
-function removeQImg(idx){
-  delete _qImages[idx];
-  var p=document.getElementById('qimg-preview-'+idx);if(p)p.innerHTML='';
-}
+function removeQImg(idx){delete _qImages[idx];var p=document.getElementById('qimg-preview-'+idx);if(p)p.innerHTML='';}
 function attachOptImg(input,qIdx,oIdx){
   var file=input.files[0];if(!file)return;
   var r=new FileReader();
   r.onload=function(e){
     _oImages[qIdx+'-'+oIdx]=e.target.result;
     var p=document.getElementById('oimg-preview-'+qIdx+'-'+oIdx);
-    if(p){p.tagName==='DIV'?p.outerHTML='<img class="opt-img-preview" id="oimg-preview-'+qIdx+'-'+oIdx+'" src="'+e.target.result+'" alt="">':p.src=e.target.result;
-    // re-get after outerHTML replace
-    var p2=document.getElementById('oimg-preview-'+qIdx+'-'+oIdx);
-    if(p2)p2.src=e.target.result;}
+    if(p){p.src=e.target.result;p.style.display='block';}
   };
   r.readAsDataURL(file);
 }
+function updateQCount(){setEl('q-count',document.querySelectorAll('.q-item').length);}
 
 function collectTest(publish){
   var qs=[];
@@ -718,10 +701,10 @@ function collectTest(publish){
       var oImg=_oImages[idx+'-'+oi]||'';
       var correct;
       if(isMulti){correct=(document.getElementById('qr-'+idx+'-'+oi)||{}).checked||false;}
-      else{correct=(document.querySelector('input[name="qr-'+idx+'"]:checked')||{}).value===''+oi;}
+      else{var sel=document.querySelector('input[name="qr-'+idx+'"]:checked');correct=sel&&sel.value===String(oi);}
       if(t2||oImg){if(correct){hasCorrect=true;correctOpts.push(oi);}opts.push({text:t2,isCorrect:correct,imageData:oImg||undefined});}
     }
-    if(!hasCorrect){toast('Q'+(qi+1)+': Please select the correct answer','error');throw new Error('validation');}
+    if(!hasCorrect){toast('Q'+(qi+1)+': Select the correct answer','error');throw new Error('validation');}
     if(opts.length<2){toast('Q'+(qi+1)+': Add at least 2 options','error');throw new Error('validation');}
     qs.push({questionText:text,questionImage:qImg||undefined,options:opts,isMultiChoice:isMulti,correctOptions:correctOpts,marks:marks,negativeMarks:neg,explanation:exp});
   }
@@ -744,9 +727,9 @@ function saveDraft(){saveTest(false);}
 function savePublish(){saveTest(true);}
 function saveTest(publish){
   var data;try{data=collectTest(publish);}catch(e){return;}
-  if(!data.title){toast('Title is required','error');return;}
-  if(!data.subject){toast('Subject is required','error');return;}
-  if(!data.topic){toast('Topic is required','error');return;}
+  if(!data.title){toast('Title required','error');return;}
+  if(!data.subject){toast('Subject required','error');return;}
+  if(!data.topic){toast('Topic required','error');return;}
   if(!data.questions.length){toast('Add at least one question','error');return;}
   var eid=gv('edit-test-id');
   api(eid?'/api/admin/tests/'+eid:'/api/admin/tests',{method:eid?'PUT':'POST',body:JSON.stringify(data)}).then(function(){
@@ -761,7 +744,7 @@ function editTest(id){
     adminTab('create-test');
     setTimeout(function(){
       document.getElementById('edit-test-id').value=id;
-      document.getElementById('ct-label').innerHTML='<i class="fas fa-edit" style="color:var(--gold)"></i> Edit Test';
+      document.getElementById('ct-label').innerHTML='<i class="fas fa-edit" style="color:#b8860b"></i> Edit Test';
       function sv(el,val){var e=document.getElementById(el);if(e)e.value=val||'';}
       sv('ct-title',t.title);sv('ct-subject',t.subject);sv('ct-topic',t.topic);
       sv('ct-desc',t.description);sv('ct-duration',t.duration);sv('ct-ad-url',t.adRedirectUrl);
@@ -769,28 +752,26 @@ function editTest(id){
       if(t.startTime)sv('ct-start',new Date(t.startTime).toISOString().slice(0,16));
       if(t.endTime)sv('ct-end',new Date(t.endTime).toISOString().slice(0,16));
       var tb=t.targetBatches||[];
-      var b11=document.getElementById('batch-11');if(b11)b11.checked=tb.includes('11');
-      var b12=document.getElementById('batch-12');if(b12)b12.checked=tb.includes('12');
-      var bdrop=document.getElementById('batch-drop');if(bdrop)bdrop.checked=tb.includes('dropper');
+      var b11=document.getElementById('batch-11');if(b11)b11.checked=tb.indexOf('11')!==-1;
+      var b12=document.getElementById('batch-12');if(b12)b12.checked=tb.indexOf('12')!==-1;
+      var bdrop=document.getElementById('batch-drop');if(bdrop)bdrop.checked=tb.indexOf('dropper')!==-1;
       document.getElementById('qs-container').innerHTML='';S.qCounter=0;_qImages={};_oImages={};
       (t.questions||[]).forEach(function(q){addQ(q);});
       loadImagePicker();
       setTimeout(function(){
         (t.adImages||[]).forEach(function(imgId){
           var cb=document.querySelector('input[name="ad-img-sel"][value="'+imgId+'"]');
-          if(cb){cb.checked=true;var img=cb.parentElement&&cb.parentElement.querySelector('img');if(img)img.style.borderColor='var(--gold)';}
+          if(cb){cb.checked=true;var img=cb.parentElement&&cb.parentElement.querySelector('img');if(img)img.style.borderColor='#b8860b';}
         });
       },300);
     },100);
   }).catch(function(err){toast(err.message,'error');});
 }
-function updateQCount(){setEl('q-count',document.querySelectorAll('.q-item').length);}
 
-//  IMAGE MANAGER 
+// IMAGES
 var _imgFile=null;
 function handleImgSelect(input){
-  _imgFile=input.files[0];
-  if(!_imgFile)return;
+  _imgFile=input.files[0];if(!_imgFile)return;
   var r=new FileReader();
   r.onload=function(e){
     var pw=document.getElementById('img-preview-wrap');var ps=document.getElementById('img-preview-src');
@@ -815,7 +796,7 @@ function uploadImage(){
     _imgFile=null;
     var pw=document.getElementById('img-preview-wrap');if(pw)pw.style.display='none';
     ['img-title','img-desc','img-url'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
-    document.getElementById('img-file-input').value='';
+    var fi=document.getElementById('img-file-input');if(fi)fi.value='';
     loadAdminImages();
   }).catch(function(err){
     btn.disabled=false;btn.innerHTML='<i class="fas fa-upload"></i> Upload Image';
@@ -824,49 +805,49 @@ function uploadImage(){
 }
 function loadAdminImages(){
   api('/api/admin/ad-images').then(function(imgs){
-    S.allImages=imgs;
-    setEl('img-count',imgs.length);
+    S.allImages=imgs;setEl('img-count',imgs.length);
     var c=document.getElementById('img-manager-grid');if(!c)return;
-    if(!imgs.length){c.innerHTML='<p style="color:var(--text-muted);padding:14px">No images yet. Upload above.</p>';return;}
-    c.innerHTML=imgs.map(function(img){
-      return '<div class="img-card"><img class="img-card-img" src="'+img.imageData+'" alt="'+esc(img.title||'')+'" loading="lazy">' +
-        '<div class="img-card-body">' +
-        '<div class="img-card-title">'+esc(img.title||'Untitled')+'</div>' +
-        (img.description?'<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">'+esc(img.description)+'</div>':'') +
-        '<div class="img-card-url">'+(img.redirectUrl?'<a href="'+esc(img.redirectUrl)+'" target="_blank" rel="noopener" style="color:var(--gold);font-size:10px">'+esc(img.redirectUrl)+'</a>':'<span style="font-size:10px;color:var(--text-muted)">No link</span>')+'</div>' +
-        '<div class="img-card-badges"><span class="img-badge '+(img.showOnHome?'img-badge-home':'img-badge-hidden')+'">'+(img.showOnHome?'On Home':'Hidden')+'</span></div>' +
-        '<div class="img-card-actions">' +
-        '<button class="btn btn-outline btn-sm" style="font-size:11px;padding:5px 9px" onclick="editImagePrompt(''+img._id+'',''+esc(img.title||'').replace(/'/g,"\'")+'',''+esc(img.description||'').replace(/'/g,"\'")+'',''+esc(img.redirectUrl||'').replace(/'/g,"\'")+'','+img.showOnHome+')"><i class="fas fa-edit"></i> Edit</button>' +
-        '<button class="btn btn-red btn-sm" style="font-size:11px;padding:5px 9px" onclick="deleteImage(''+img._id+'')"><i class="fas fa-trash"></i></button>' +
-        '</div></div></div>';
-    }).join('');
-    // Also refresh image picker in create-test tab
+    if(!imgs.length){c.innerHTML='<p style="color:#888;padding:14px">No images yet.</p>';return;}
+    var html='';
+    imgs.forEach(function(img){
+      html+='<div class="img-card">';
+      html+='<img class="img-card-img" src="'+img.imageData+'" alt="'+esc(img.title||'')+'" loading="lazy">';
+      html+='<div class="img-card-body">';
+      html+='<div class="img-card-title">'+esc(img.title||'Untitled')+'</div>';
+      if(img.description)html+='<div style="font-size:10px;color:#888;margin-bottom:2px">'+esc(img.description)+'</div>';
+      html+='<div class="img-card-url">'+(img.redirectUrl?'<a href="'+esc(img.redirectUrl)+'" target="_blank" style="color:#b8860b;font-size:10px">'+esc(img.redirectUrl)+'</a>':'<span style="font-size:10px;color:#888">No link</span>')+'</div>';
+      html+='<div style="margin-bottom:6px"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:'+(img.showOnHome?'#dcfce7':'#fee2e2')+';color:'+(img.showOnHome?'#15803d':'#c53030')+'">'+(img.showOnHome?'On Home':'Hidden')+'</span></div>';
+      html+='<div class="img-card-actions">';
+      html+='<button class="btn btn-outline btn-sm" style="font-size:11px;padding:5px 9px" onclick="editImagePrompt(\''+img._id+'\')"><i class="fas fa-edit"></i> Edit</button>';
+      html+='<button class="btn btn-red btn-sm" style="font-size:11px;padding:5px 9px" onclick="deleteImage(\''+img._id+'\')"><i class="fas fa-trash"></i></button>';
+      html+='</div></div></div>';
+    });
+    c.innerHTML=html;
     var checked=[];
     document.querySelectorAll('input[name="ad-img-sel"]:checked').forEach(function(cb){checked.push(cb.value);});
     buildImagePicker(imgs,checked);
   }).catch(function(){});
 }
-function editImagePrompt(id,title,desc,url,showOnHome){
-  var newTitle=prompt('Image title:',title);if(newTitle===null)return;
-  var newDesc=prompt('Description:',desc);if(newDesc===null)return;
-  var newUrl=prompt('Redirect URL (leave blank for none):',url);if(newUrl===null)return;
-  api('/api/admin/ad-images/'+id,{method:'PUT',body:JSON.stringify({title:newTitle,description:newDesc,redirectUrl:newUrl,showOnHome:showOnHome!==false})}).then(function(){
-    toast('Image updated!','success');loadAdminImages();
+function editImagePrompt(id){
+  var img=S.allImages.filter(function(i){return i._id===id;})[0];if(!img)return;
+  var newTitle=prompt('Title:',img.title||'');if(newTitle===null)return;
+  var newDesc=prompt('Description:',img.description||'');if(newDesc===null)return;
+  var newUrl=prompt('Click URL (leave blank for none):',img.redirectUrl||'');if(newUrl===null)return;
+  api('/api/admin/ad-images/'+id,{method:'PUT',body:JSON.stringify({title:newTitle,description:newDesc,redirectUrl:newUrl,showOnHome:img.showOnHome!==false})}).then(function(){
+    toast('Updated!','success');loadAdminImages();
   }).catch(function(err){toast(err.message,'error');});
 }
 function deleteImage(id){
   if(!confirm('Delete this image permanently?'))return;
-  api('/api/admin/ad-images/'+id,{method:'DELETE'}).then(function(){toast('Image deleted','info');loadAdminImages();}).catch(function(err){toast(err.message,'error');});
+  api('/api/admin/ad-images/'+id,{method:'DELETE'}).then(function(){toast('Deleted','info');loadAdminImages();}).catch(function(err){toast(err.message,'error');});
 }
 
-//  STUDENTS 
+// STUDENTS
 function loadAdminStudents(){
   var c=document.getElementById('students-table');if(!c)return;
   api('/api/admin/students?limit=2000').then(function(r){
-    S.allStudents=r.students;
-    setEl('students-count',r.total);
-    renderStudents(r.students);
-  }).catch(function(err){c.innerHTML='<p style="color:var(--red)">'+esc(err.message)+'</p>';});
+    S.allStudents=r.students;setEl('students-count',r.total);renderStudents(r.students);
+  }).catch(function(err){c.innerHTML='<p style="color:#c53030">'+esc(err.message)+'</p>';});
 }
 function filterByBatch(batch){
   S.allStudentsBatch=batch;
@@ -874,8 +855,7 @@ function filterByBatch(batch){
   filterStudents();
 }
 function filterStudents(){
-  var q=gv('student-search').toLowerCase();
-  var batch=S.allStudentsBatch;
+  var q=gv('student-search').toLowerCase();var batch=S.allStudentsBatch;
   var list=S.allStudents.filter(function(s){
     var bMatch=!batch||(s.batch===batch);
     var sMatch=!q||(s.name||'').toLowerCase().indexOf(q)!==-1||(s.email||'').toLowerCase().indexOf(q)!==-1||(s.phone||'').indexOf(q)!==-1||(s.coachingName||'').toLowerCase().indexOf(q)!==-1;
@@ -885,57 +865,59 @@ function filterStudents(){
 }
 function renderStudents(list){
   var c=document.getElementById('students-table');if(!c)return;
-  if(!list.length){c.innerHTML='<p style="text-align:center;color:var(--text-muted);padding:28px">No students found.</p>';return;}
+  if(!list.length){c.innerHTML='<p style="text-align:center;color:#888;padding:28px">No students found.</p>';return;}
   var bMap={'11':'Class 11','12':'Class 12','dropper':'Dropper'};
-  var bClr={'11':'#dbeafe::#1e40af','12':'#dcfce7::#15803d','dropper':'#fef3c7::#92400e'};
-  c.innerHTML='<div style="overflow-x:auto"><table class="students-table"><thead><tr><th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Batch</th><th>Coaching</th><th>Father</th><th>WhatsApp</th><th>Tests</th><th>Total Marks</th><th>Joined</th></tr></thead><tbody>'+
-    list.map(function(s,i){
-      var bColors=(bClr[s.batch]||'#f0f0f0::#555').split('::');
-      return '<tr><td>'+(i+1)+'</td><td><strong>'+esc(s.name)+'</strong></td><td style="font-size:11px">'+esc(s.email)+'</td><td>'+esc(s.phone||'')+'</td>' +
-        '<td><span style="padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;background:'+bColors[0]+';color:'+bColors[1]+'">'+esc(bMap[s.batch]||s.batch||'')+'</span></td>' +
-        '<td>'+esc(s.coachingName||'')+'</td><td>'+esc(s.fatherName||'')+'</td><td>'+esc(s.whatsappNumber||'')+'</td>' +
-        '<td>'+( s.totalTests||0)+'</td><td class="marks-cell">'+(s.totalMarks||0)+'</td>' +
-        '<td style="font-size:11px">'+new Date(s.createdAt).toLocaleDateString('en-IN')+'</td></tr>';
-    }).join('')+'</tbody></table></div>';
+  var html='<div style="overflow-x:auto"><table class="students-table"><thead><tr><th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Batch</th><th>Coaching</th><th>Tests</th><th>Total Marks</th><th>Joined</th></tr></thead><tbody>';
+  list.forEach(function(s,i){
+    var bColors={'11':'#dbeafe:#1e40af','12':'#dcfce7:#15803d','dropper':'#fef3c7:#92400e'}[s.batch]||'#f0f0f0:#555';
+    var bc=bColors.split(':');
+    html+='<tr><td>'+(i+1)+'</td><td><strong>'+esc(s.name)+'</strong></td><td style="font-size:11px">'+esc(s.email)+'</td><td>'+esc(s.phone||'-')+'</td>';
+    html+='<td><span style="padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;background:'+bc[0]+';color:'+bc[1]+'">'+esc(bMap[s.batch]||s.batch||'-')+'</span></td>';
+    html+='<td>'+esc(s.coachingName||'-')+'</td><td>'+(s.totalTests||0)+'</td><td style="font-family:monospace;color:#b8860b">'+(s.totalMarks||0)+'</td>';
+    html+='<td style="font-size:11px">'+new Date(s.createdAt).toLocaleDateString('en-IN')+'</td></tr>';
+  });
+  html+='</tbody></table></div>';
+  c.innerHTML=html;
 }
 
-//  CHEAT LOGS 
+// CHEAT LOGS
 function loadCheatLogs(){
   var c=document.getElementById('cheat-list');if(!c)return;
   api('/api/push/cheat-logs').then(function(logs){
-    if(!logs.length){c.innerHTML='<p style="text-align:center;color:var(--text-muted);padding:28px">No cheating reports yet.</p>';return;}
-    c.innerHTML=logs.map(function(l){
-      return '<div class="cheat-item"><h4><i class="fas fa-exclamation-triangle"></i> '+esc(l.userName)+'  '+l.violations+' violation(s) '+(l.autoSubmitted?'<span style="background:var(--red-light);color:var(--red);padding:1px 6px;border-radius:4px;font-size:10px">AUTO-SUBMITTED</span>':'')+'</h4>' +
-        '<p><i class="fas fa-envelope" style="margin-right:4px"></i>'+esc(l.userEmail)+'</p>' +
-        '<p><i class="fas fa-file-alt" style="margin-right:4px"></i>'+esc(l.testTitle||'')+'</p>' +
-        '<p><i class="fas fa-info-circle" style="margin-right:4px"></i>'+esc(l.details||'')+' &mdash; '+new Date(l.createdAt).toLocaleString('en-IN')+'</p></div>';
-    }).join('');
-  }).catch(function(err){c.innerHTML='<p style="color:var(--red)">'+esc(err.message)+'</p>';});
+    if(!logs.length){c.innerHTML='<p style="text-align:center;color:#888;padding:28px">No cheating reports yet.</p>';return;}
+    var html='';
+    logs.forEach(function(l){
+      html+='<div class="cheat-item"><h4><i class="fas fa-exclamation-triangle"></i> '+esc(l.userName)+' - '+l.violations+' violation(s) '+(l.autoSubmitted?'<span style="background:#fee2e2;color:#c53030;padding:1px 6px;border-radius:4px;font-size:10px">AUTO-SUBMITTED</span>':'')+'</h4>';
+      html+='<p><i class="fas fa-envelope" style="margin-right:4px"></i>'+esc(l.userEmail)+'</p>';
+      html+='<p><i class="fas fa-file-alt" style="margin-right:4px"></i>'+esc(l.testTitle||'-')+'</p>';
+      html+='<p><i class="fas fa-info-circle" style="margin-right:4px"></i>'+esc(l.details||'-')+' - '+new Date(l.createdAt).toLocaleString('en-IN')+'</p></div>';
+    });
+    c.innerHTML=html;
+  }).catch(function(err){c.innerHTML='<p style="color:#c53030">'+esc(err.message)+'</p>';});
 }
 
-//  ANALYTICS / STORAGE 
+// ANALYTICS
 function loadAdminStats(){
   api('/api/admin/stats').then(function(s){
-    setEl('an-tests',s.totalTests);
-    setEl('an-students',s.totalStudents);
-    setEl('an-attempts',s.totalAttempts);
+    setEl('an-tests',s.totalTests);setEl('an-students',s.totalStudents);setEl('an-attempts',s.totalAttempts);
     var sc=document.getElementById('storage-info');if(!sc)return;
     if(s.storageInfo){
-      var si=s.storageInfo;
-      var clr=si.usedPct>80?'#c53030':si.usedPct>60?'#d97706':'#276749';
-      sc.innerHTML=
-        '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">' +
-        '<span><strong>'+si.usedMB+'MB</strong> used of <strong>'+si.totalMB+'MB</strong> free tier</span>' +
-        '<span style="color:'+clr+'"><strong>'+si.usedPct+'%</strong> full</span>' +
-        '</div>' +
-        '<div class="storage-bar-wrap"><div class="storage-bar-fill" style="width:'+si.usedPct+'%;background:'+clr+'"></div></div>' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">' +
-        '<span style="font-size:11px;color:var(--text-muted)">'+si.freesMB+'MB free remaining</span>' +
-        '<a href="https://cloud.mongodb.com" target="_blank" rel="noopener" class="btn btn-outline btn-sm" style="font-size:11px"><i class="fas fa-arrow-up"></i> Upgrade on MongoDB Atlas</a>' +
-        '</div>' +
-        (si.usedPct>75?'<p style="font-size:11px;color:var(--red);margin-top:6px"><i class="fas fa-exclamation-triangle"></i> Storage above 75%. Consider deleting old test results or upgrading.</p>':'');
+      var si=s.storageInfo;var clr=si.usedPct>80?'#c53030':si.usedPct>60?'#d97706':'#276749';
+      sc.innerHTML='<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span><strong>'+si.usedMB+'MB</strong> of <strong>'+si.totalMB+'MB</strong></span><span style="color:'+clr+'"><strong>'+si.usedPct+'%</strong></span></div>'+
+        '<div style="height:10px;background:#e5dfd0;border-radius:5px;overflow:hidden;margin-bottom:6px"><div style="height:100%;width:'+si.usedPct+'%;background:'+clr+';border-radius:5px"></div></div>'+
+        '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:11px;color:#888">'+si.freesMB+'MB free</span>'+
+        '<a href="https://cloud.mongodb.com" target="_blank" class="btn btn-outline btn-sm" style="font-size:11px"><i class="fas fa-arrow-up"></i> Upgrade</a></div>'+
+        (si.usedPct>75?'<p style="font-size:11px;color:#c53030;margin-top:6px"><i class="fas fa-exclamation-triangle"></i> Storage above 75%. Consider deleting old results or upgrading.</p>':'');
     } else {
-      sc.innerHTML='<span style="font-size:12px;color:var(--text-muted)">Storage info unavailable. <a href="https://cloud.mongodb.com" target="_blank">Manage on MongoDB Atlas &rarr;</a></span>';
+      sc.innerHTML='<span style="font-size:12px;color:#888">Storage info unavailable. <a href="https://cloud.mongodb.com" target="_blank">Check MongoDB Atlas</a></span>';
+    }
+    // Google Sheets stats
+    if(s.sheetStats){
+      var ss=s.sheetStats;
+      var ssEl=document.getElementById('sheet-stats');
+      if(ssEl){
+        ssEl.innerHTML='<div style="font-size:13px"><i class="fas fa-table" style="color:#0f9d58"></i> <strong>Google Sheet:</strong> '+ss.resultsRows+' results, '+ss.studentsRows+' students &nbsp;|&nbsp; <a href="'+ss.mainSheetUrl+'" target="_blank" style="color:#0f9d58"><i class="fas fa-external-link-alt"></i> Open Sheet</a></div>';
+      }
     }
   }).catch(function(){});
 }
@@ -943,16 +925,18 @@ function loadAdminLeaderboard(batch){
   ['all','11','12','dropper'].forEach(function(b){var el=document.getElementById('alf-'+b);if(el)el.classList.toggle('active',(batch===''&&b==='all')||(batch===b));});
   var c=document.getElementById('admin-leaderboard');if(!c)return;
   api('/api/rankings/leaderboard?batch='+batch).then(function(data){
-    if(!data.length){c.innerHTML='<p style="text-align:center;color:var(--text-muted);padding:24px">No data yet.</p>';return;}
+    if(!data.length){c.innerHTML='<p style="text-align:center;color:#888;padding:24px">No data yet.</p>';return;}
     var bMap={'11':'11th','12':'12th','dropper':'Drop'};
-    c.innerHTML='<div style="overflow-x:auto"><table class="rank-table"><thead><tr><th>Rank</th><th>Name</th><th>Email</th><th>Coaching</th><th>Batch</th><th>Tests</th><th>Total</th><th>Highest</th></tr></thead><tbody>'+
-      data.slice(0,100).map(function(u,i){
-        return '<tr><td>'+(i+1)+'</td><td>'+esc(u.name)+'</td><td style="font-size:10px">'+esc(u.email||'')+'</td><td>'+esc(u.coachingName||'')+'</td><td>'+(bMap[u.batch]||'')+'</td><td>'+u.totalTests+'</td><td class="marks-cell">'+u.totalMarks+'</td><td class="marks-cell">'+u.highestMarks+'</td></tr>';
-      }).join('')+'</tbody></table></div>';
+    var html='<div style="overflow-x:auto"><table class="rank-table"><thead><tr><th>Rank</th><th>Name</th><th>Email</th><th>Coaching</th><th>Batch</th><th>Tests</th><th>Total</th><th>Highest</th></tr></thead><tbody>';
+    data.slice(0,100).forEach(function(u,i){
+      html+='<tr><td>'+(i+1)+'</td><td>'+esc(u.name)+'</td><td style="font-size:10px">'+esc(u.email||'-')+'</td><td>'+esc(u.coachingName||'-')+'</td><td>'+(bMap[u.batch]||'-')+'</td><td>'+u.totalTests+'</td><td style="font-family:monospace;color:#b8860b">'+u.totalMarks+'</td><td style="font-family:monospace">'+u.highestMarks+'</td></tr>';
+    });
+    html+='</tbody></table></div>';
+    c.innerHTML=html;
   }).catch(function(){});
 }
 
-//  PUSH / ANNOUNCE 
+// PUSH
 function sendAnnouncement(){
   var title=gv('ann-title'),body=gv('ann-body'),url=gv('ann-url');
   if(!title||!body){toast('Title and message required','error');return;}
@@ -961,21 +945,22 @@ function sendAnnouncement(){
   }).catch(function(err){toast(err.message,'error');});
 }
 
-//  EMAIL TEST 
+// EMAIL TEST
 function testEmailConfig(){
-  var addr=gv('test-email-addr');
-  if(!addr){toast('Enter an email address','error');return;}
+  var addr=gv('test-email-addr');if(!addr){toast('Enter an email address','error');return;}
   var res=document.getElementById('email-test-result');
   if(res){res.style.display='block';res.style.background='#f0f0f0';res.innerHTML='<i class="fas fa-spinner fa-spin"></i> Sending test email...';}
   api('/api/auth/test-email?to='+encodeURIComponent(addr)).then(function(r){
-    if(res){res.style.background='#dcfce7';res.style.color='#15803d';res.innerHTML='<i class="fas fa-check-circle"></i> '+r.message+'  Check inbox (also check spam folder)';}
+    if(res){res.style.background='#dcfce7';res.style.color='#15803d';res.innerHTML='<i class="fas fa-check-circle"></i> '+r.message;}
     toast('Test email sent! Check inbox.','success');
   }).catch(function(err){
-    if(res){res.style.background='#fee2e2';res.style.color='#c53030';res.innerHTML='<i class="fas fa-times-circle"></i> FAILED: '+(err.message||'Unknown error')+'<br><small>Check EMAIL_USER and EMAIL_PASS in Render environment variables.</small>';}
+    if(res){res.style.background='#fee2e2';res.style.color='#c53030';res.innerHTML='<i class="fas fa-times-circle"></i> FAILED: '+(err.message||'Unknown error')+'<br><small>Check EMAIL_USER and EMAIL_PASS in Render env vars.</small>';}
     toast('Email failed: '+(err.message),'error',8000);
   });
 }
 </script>
-<script>(function(){var s=document.createElement('script');s.src='/socket.io/socket.io.js';s.async=true;document.body.appendChild(s);})();</script>
+<script>
+(function(){var s=document.createElement('script');s.src='/socket.io/socket.io.js';s.async=true;document.body.appendChild(s);})();
+</script>
 </body>
 </html>
