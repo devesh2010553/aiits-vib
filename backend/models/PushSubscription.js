@@ -1,8 +1,3 @@
 const mongoose = require('mongoose');
-const pushSubscriptionSchema = new mongoose.Schema({
-  userId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  endpoint: { type: String, required: true, unique: true },
-  keys:     { p256dh: String, auth: String },
-  createdAt:{ type: Date, default: Date.now }
-}, { timestamps: true });
-module.exports = mongoose.model('PushSubscription', pushSubscriptionSchema);
+const schema = new mongoose.Schema({ userId:{type:mongoose.Schema.Types.ObjectId,ref:'User'}, endpoint:{type:String,required:true,unique:true}, keys:{p256dh:String,auth:String} }, { timestamps:true });
+module.exports = mongoose.model('PushSubscription', schema);
