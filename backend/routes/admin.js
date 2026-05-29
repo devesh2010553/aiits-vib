@@ -1,11 +1,12 @@
-const express  = require('express');
-const router   = express.Router();
-const multer   = require('multer');
-const mongoose = require('mongoose');
-const Test     = require('../models/Test');
-const User     = require('../models/User');
-const Result   = require('../models/Result');
-const AdImage  = require('../models/AdImage');
+const express     = require('express');
+const router      = express.Router();
+const multer      = require('multer');
+const mongoose    = require('mongoose');
+const Test        = require('../models/Test');
+const UserProfile = require('../models/UserProfile');
+const Result      = require('../models/Result');
+const AdImage     = require('../models/AdImage');
+const admin       = require('../utils/firebaseAdmin');
 const { authenticateAdmin } = require('../middleware/auth');
 
 router.use(authenticateAdmin);
@@ -15,7 +16,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 *
 router.get('/stats', async (req, res) => {
   try {
     const [totalTests, totalStudents, totalAttempts] = await Promise.all([
-      Test.countDocuments(), User.countDocuments(),
+      Test.countDocuments(), UserProfile.countDocuments(),
       Result.countDocuments({ inProgress: false })
     ]);
     let storageInfo = null;
@@ -59,7 +60,6 @@ router.patch('/tests/:id/publish', async (req, res) => {
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
-// Delete entire test + its results
 router.delete('/tests/:id', async (req, res) => {
   try {
     await Promise.all([Test.findByIdAndDelete(req.params.id), Result.deleteMany({ testId: req.params.id })]);
@@ -67,7 +67,7 @@ router.delete('/tests/:id', async (req, res) => {
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
-// DELETE RESULTS for a test by batch — THIS was missing (404 error)
+// Delete results for a test by batch
 router.delete('/tests/:id/results', async (req, res) => {
   try {
     const testId = req.params.id;
@@ -75,23 +75,19 @@ router.delete('/tests/:id/results', async (req, res) => {
     const filter = { testId, inProgress: false };
     if (batch && batch !== 'all') filter.batch = batch;
 
-    // Get affected users
     const affected = await Result.find(filter).select('userId obtainedMarks');
     const userIds  = [...new Set(affected.map(r => String(r.userId)))];
 
-    // Delete from MongoDB
     const del = await Result.deleteMany(filter);
 
-    // Recalculate user stats
     for (const uid of userIds) {
       const rem = await Result.find({ userId: uid, inProgress: false });
-      await User.findByIdAndUpdate(uid, {
+      await UserProfile.findByIdAndUpdate(uid, {
         totalTests:   rem.length,
         totalMarks:   rem.reduce((s,r) => s+(r.obtainedMarks||0), 0),
         highestMarks: rem.length ? Math.max(...rem.map(r=>r.obtainedMarks||0)) : 0
       });
     }
-    // Update test attempt count
     await Test.findByIdAndUpdate(testId, { attemptCount: await Result.countDocuments({ testId, inProgress: false }) });
 
     res.json({ deleted: del.deletedCount, message: 'Results deleted from MongoDB' });
@@ -104,7 +100,7 @@ router.delete('/tests/:id/results', async (req, res) => {
 router.get('/tests/:id/results', async (req, res) => {
   try {
     res.json(await Result.find({ testId: req.params.id, inProgress: false })
-      .populate('userId','name email phone coachingName batch')
+      .populate('userId','name phone coachingName batch')
       .sort({ obtainedMarks: -1, timeTaken: 1 }));
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
@@ -114,17 +110,31 @@ router.get('/students', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit)||2000;
     const [students, total] = await Promise.all([
-      User.find().select('-password -otp -otpExpiry').sort({ createdAt: -1 }).limit(limit),
-      User.countDocuments()
+      UserProfile.find().sort({ createdAt: -1 }).limit(limit),
+      UserProfile.countDocuments()
     ]);
-    res.json({ students, total });
+    // Fetch emails from Firebase in batch (up to 100 at a time)
+    const studentsWithEmail = await Promise.all(students.map(async (s) => {
+      try {
+        const fbUser = await admin.auth().getUser(s.uid);
+        return { ...s.toObject(), email: fbUser.email };
+      } catch {
+        return { ...s.toObject(), email: '' };
+      }
+    }));
+    res.json({ students: studentsWithEmail, total });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
 // Delete specific student
 router.delete('/students/:id', async (req, res) => {
   try {
-    await Promise.all([User.findByIdAndDelete(req.params.id), Result.deleteMany({ userId: req.params.id })]);
+    const profile = await UserProfile.findById(req.params.id);
+    await Promise.all([
+      UserProfile.findByIdAndDelete(req.params.id),
+      Result.deleteMany({ userId: req.params.id }),
+      profile ? admin.auth().deleteUser(profile.uid).catch(() => {}) : Promise.resolve()
+    ]);
     res.json({ message: 'Student and their results deleted' });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
@@ -134,12 +144,17 @@ router.delete('/students/batch/:batch', async (req, res) => {
   try {
     const batch = req.params.batch;
     if (!['11','12','dropper'].includes(batch)) return res.status(400).json({ error: 'Invalid batch' });
-    const users   = await User.find({ batch }).select('_id');
-    const userIds = users.map(u => u._id);
+    const profiles = await UserProfile.find({ batch }).select('_id uid');
+    const userIds  = profiles.map(u => u._id);
+
     const [uDel, rDel] = await Promise.all([
-      User.deleteMany({ batch }),
+      UserProfile.deleteMany({ batch }),
       Result.deleteMany({ userId: { $in: userIds } })
     ]);
+
+    // Delete from Firebase (best-effort)
+    await Promise.all(profiles.map(p => admin.auth().deleteUser(p.uid).catch(() => {})));
+
     res.json({ deletedStudents: uDel.deletedCount, deletedResults: rDel.deletedCount });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });

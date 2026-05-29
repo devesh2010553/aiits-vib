@@ -9,7 +9,7 @@
 <meta name="robots" content="index,follow">
 <meta property="og:title" content="AIITS - All India Topicwise Test Series by MS Chauhan">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://aiits-msc.onrender.com">
+<meta property="og:url" content="https://msc.aiits.workers.dev">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#b8860b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -475,32 +475,23 @@ textarea{resize:vertical}
 
 <!-- FORGOT PASSWORD PAGE -->
 <div id="page-forgot" class="page">
-  <div class="auth-layout">
-    <div class="auth-panel-left"><div class="auth-brand"><div class="auth-logo">AIITS</div><p>Reset Password</p></div></div>
-    <div class="auth-panel-right">
+  <div class="auth-box">
       <button class="back-btn" onclick="showPage('page-login')"><i class="fas fa-arrow-left"></i> Back</button>
-      <h2 class="auth-title">Forgot Password</h2>
+      <h2 class="auth-title">Reset Password</h2>
       <div id="forgot-step-1">
-        <p class="auth-sub">Enter your registered email to receive OTP</p>
+        <p class="auth-sub">Enter your registered email — a reset link will be sent directly to your inbox. No OTP needed.</p>
         <div class="fg"><label>Email Address</label><input type="email" id="forgot-email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')sendForgotOtp()"></div>
-        <button class="btn btn-gold btn-full" style="margin-top:14px" onclick="sendForgotOtp()" id="forgot-btn"><i class="fas fa-paper-plane"></i> Send OTP</button>
+        <button class="btn btn-gold btn-full" style="margin-top:14px" onclick="sendForgotOtp()" id="forgot-btn"><i class="fas fa-paper-plane"></i> Send Reset Email</button>
       </div>
-      <div id="forgot-step-2" class="hidden">
-        <p class="auth-sub" id="forgot-otp-hint">OTP sent to your email</p>
-        <div class="otp-row">
-          <input class="otp-box" type="text" maxlength="1" inputmode="numeric" oninput="otpMove(this,0)" onkeydown="otpBack(event,0)">
-          <input class="otp-box" type="text" maxlength="1" inputmode="numeric" oninput="otpMove(this,1)" onkeydown="otpBack(event,1)">
-          <input class="otp-box" type="text" maxlength="1" inputmode="numeric" oninput="otpMove(this,2)" onkeydown="otpBack(event,2)">
-          <input class="otp-box" type="text" maxlength="1" inputmode="numeric" oninput="otpMove(this,3)" onkeydown="otpBack(event,3)">
-          <input class="otp-box" type="text" maxlength="1" inputmode="numeric" oninput="otpMove(this,4)" onkeydown="otpBack(event,4)">
-          <input class="otp-box" type="text" maxlength="1" inputmode="numeric" oninput="otpMove(this,5)" onkeydown="otpBack(event,5)">
-        </div>
-        <div class="fg"><label>New Password</label><div class="pw-wrap"><input type="password" id="new-password" placeholder="Min 6 characters" minlength="6"><button type="button" class="pw-toggle" onclick="togglePw('new-password',this)"><i class="fas fa-eye"></i></button></div></div>
-        <button class="btn btn-gold btn-full" style="margin-top:12px" onclick="resetPassword()" id="reset-btn"><i class="fas fa-lock"></i> Reset Password</button>
-        <p class="auth-switch" style="margin-top:10px"><a onclick="sendForgotOtp()">Resend OTP</a></p>
+      <div id="forgot-step-success" class="hidden" style="text-align:center;padding:20px 0">
+        <div style="font-size:48px;margin-bottom:12px">📧</div>
+        <p style="font-weight:600;margin-bottom:8px">Check your inbox!</p>
+        <p class="auth-sub">A password reset link has been sent to your email.<br>Click the link to set a new password.<br><br><small style="opacity:0.7">Check spam folder if you don't see it within a minute.</small></p>
+        <button class="btn btn-outline btn-full" style="margin-top:20px" onclick="showPage('page-login')">Back to Login</button>
+        <p class="auth-switch" style="margin-top:12px">Didn't get it? <a onclick="document.getElementById('forgot-step-success').classList.add('hidden');document.getElementById('forgot-step-1').classList.remove('hidden')">Try again</a></p>
       </div>
-    </div>
   </div>
+</div>
 </div>
 
 <!-- STUDENT DASHBOARD -->
@@ -743,7 +734,15 @@ function toast(msg,type,dur){
 
 function api(url,opts){
   opts=opts||{};
-  return fetch(url,{credentials:'include',headers:Object.assign({'Content-Type':'application/json'},opts.headers||{}),method:opts.method||'GET',body:opts.body||undefined}).then(function(res){
+  var firebaseUser=window._firebaseAuth&&window._firebaseAuth.currentUser;
+  if(!firebaseUser){
+    return fetch(url,{credentials:'include',headers:Object.assign({'Content-Type':'application/json'},opts.headers||{}),method:opts.method||'GET',body:opts.body||undefined}).then(function(res){
+      return res.json().then(function(data){if(!res.ok)throw new Error(data.error||('HTTP '+res.status));return data;});
+    });
+  }
+  return firebaseUser.getIdToken().then(function(idToken){
+    return fetch(url,{credentials:'include',headers:Object.assign({'Content-Type':'application/json','Authorization':'Bearer '+idToken},opts.headers||{}),method:opts.method||'GET',body:opts.body||undefined});
+  }).then(function(res){
     return res.json().then(function(data){if(!res.ok)throw new Error(data.error||('HTTP '+res.status));return data;});
   });
 }
@@ -761,20 +760,37 @@ window.addEventListener('load',function(){
 
 function checkAuth(){
   var path=window.location.pathname;
-  api('/api/auth/me').then(function(r){
-    if(r&&r.user){
-      S.user=r.user;updateNavUser();showPage('page-dashboard');loadDashboard();
-      var rp=new URLSearchParams(window.location.search).get('resume');
-      if(rp){history.replaceState({},'','/');setTimeout(function(){initiateTest(rp);},900);}
-    } else {
-      if(path==='/register')showPage('page-register');
-      else if(path==='/login')showPage('page-login');
-      else{showPage('page-home');loadHomeStats();}
-    }
-  }).catch(function(){
+  var fbAuth=window._firebaseAuth;
+  if(!fbAuth){
     if(path==='/register')showPage('page-register');
     else if(path==='/login')showPage('page-login');
     else showPage('page-home');
+    return;
+  }
+  import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){
+    m.onAuthStateChanged(fbAuth,function(firebaseUser){
+      if(!firebaseUser){
+        if(path==='/register')showPage('page-register');
+        else if(path==='/login')showPage('page-login');
+        else{showPage('page-home');loadHomeStats();}
+        return;
+      }
+      firebaseUser.getIdToken().then(function(idToken){
+        return fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+idToken}}).then(function(r){return r.json();});
+      }).then(function(r){
+        if(r&&r.user){
+          S.user=r.user;updateNavUser();showPage('page-dashboard');loadDashboard();
+          var rp=new URLSearchParams(window.location.search).get('resume');
+          if(rp){history.replaceState({},'','/');setTimeout(function(){initiateTest(rp);},900);}
+        } else {
+          showPage('page-register');
+        }
+      }).catch(function(){
+        if(path==='/register')showPage('page-register');
+        else if(path==='/login')showPage('page-login');
+        else showPage('page-home');
+      });
+    });
   });
 }
 
@@ -828,17 +844,31 @@ function handleRegister(e){
   e.preventDefault();
   var batch=gv('reg-batch');
   if(!batch){toast('Please select your batch','error');return;}
+  var email=gv('reg-email'),password=gv('reg-password');
+  if(!email||!password){toast('Email and password required','error');return;}
+  if(password.length<6){toast('Password must be at least 6 characters','error');return;}
   var btn=document.getElementById('reg-btn');
   btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Creating...';
-  var payload={name:gv('reg-name'),email:gv('reg-email'),phone:gv('reg-phone'),password:gv('reg-password'),coachingName:gv('reg-coaching'),fatherName:gv('reg-father'),fatherOccupation:gv('reg-occupation'),whatsappNumber:gv('reg-whatsapp'),batch:batch};
-  api('/api/auth/register',{method:'POST',body:JSON.stringify(payload)}).then(function(r){
+  var fbAuth=window._firebaseAuth;
+  if(!fbAuth){toast('Firebase not loaded. Please refresh.','error');btn.disabled=false;btn.innerHTML='<i class="fas fa-user-plus"></i> Create Account';return;}
+  import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){
+    return m.createUserWithEmailAndPassword(fbAuth,email,password);
+  }).then(function(cred){
+    return cred.user.getIdToken().then(function(idToken){
+      var payload={idToken:idToken,name:gv('reg-name'),phone:gv('reg-phone'),coachingName:gv('reg-coaching'),fatherName:gv('reg-father'),fatherOccupation:gv('reg-occupation'),whatsappNumber:gv('reg-whatsapp'),batch:batch};
+      return fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(res){
+        return res.json().then(function(data){if(!res.ok){cred.user.delete().catch(function(){});throw new Error(data.error||'Registration failed');}return data;});
+      });
+    });
+  }).then(function(r){
     btn.disabled=false;btn.innerHTML='<i class="fas fa-user-plus"></i> Create Account';
     S.user=r.user;updateNavUser();toast('Welcome, '+r.user.name+'!','success');
     showPage('page-dashboard');loadDashboard();
     if(window._pendingResume){var rid=window._pendingResume;window._pendingResume=null;setTimeout(function(){initiateTest(rid);},900);}
   }).catch(function(err){
     btn.disabled=false;btn.innerHTML='<i class="fas fa-user-plus"></i> Create Account';
-    toast(err.message||'Registration failed','error');
+    var map={'auth/email-already-in-use':'Email already registered. Try logging in.','auth/weak-password':'Password must be at least 6 characters.','auth/invalid-email':'Invalid email address.'};
+    toast(map[err.code]||err.message||'Registration failed','error');
   });
 }
 
@@ -847,7 +877,19 @@ function handleLogin(){
   if(!id||!pw){toast('Enter email/phone and password','error');return;}
   var btn=document.getElementById('login-btn');
   btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Logging in...';
-  api('/api/auth/login',{method:'POST',body:JSON.stringify({identifier:id,password:pw})}).then(function(r){
+  var fbAuth=window._firebaseAuth;
+  if(!fbAuth){toast('Firebase not loaded. Please refresh.','error');btn.disabled=false;btn.innerHTML='<i class="fas fa-sign-in-alt"></i> Login';return;}
+  var loginPromise;
+  if(id.includes('@')){
+    loginPromise=import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){return m.signInWithEmailAndPassword(fbAuth,id,pw);});
+  } else {
+    loginPromise=fetch('/api/auth/lookup-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:id})}).then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.error||'Account not found');return d.email;});}).then(function(email){return import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){return m.signInWithEmailAndPassword(fbAuth,email,pw);});});
+  }
+  loginPromise.then(function(cred){
+    return cred.user.getIdToken().then(function(idToken){
+      return fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+idToken}}).then(function(r){return r.json();});
+    });
+  }).then(function(r){
     btn.disabled=false;btn.innerHTML='<i class="fas fa-sign-in-alt"></i> Login';
     S.user=r.user;updateNavUser();toast('Welcome back, '+r.user.name+'!','success');
     showPage('page-dashboard');loadDashboard();
@@ -855,7 +897,8 @@ function handleLogin(){
     if(window._pendingResume){var rid=window._pendingResume;window._pendingResume=null;setTimeout(function(){initiateTest(rid);},900);}
   }).catch(function(err){
     btn.disabled=false;btn.innerHTML='<i class="fas fa-sign-in-alt"></i> Login';
-    toast(err.message||'Login failed','error');
+    var map={'auth/user-not-found':'No account found. Please register.','auth/wrong-password':'Incorrect password.','auth/invalid-credential':'Invalid email or password.','auth/too-many-requests':'Too many attempts. Please wait.','auth/invalid-email':'Invalid email address.'};
+    toast(map[err.code]||err.message||'Login failed','error');
   });
 }
 
@@ -863,40 +906,24 @@ function sendForgotOtp(){
   var email=gv('forgot-email');if(!email){toast('Enter your email','error');return;}
   var btn=document.getElementById('forgot-btn');
   btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Sending...';
-  window._forgotEmail=email;
-  api('/api/auth/forgot-password',{method:'POST',body:JSON.stringify({email:email})}).then(function(){
-    btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> Send OTP';
+  var fbAuth=window._firebaseAuth;
+  if(!fbAuth){toast('Firebase not loaded. Please refresh.','error');btn.disabled=false;return;}
+  import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){
+    return m.sendPasswordResetEmail(fbAuth,email);
+  }).then(function(){
+    btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> Send Reset Email';
     document.getElementById('forgot-step-1').classList.add('hidden');
-    document.getElementById('forgot-step-2').classList.remove('hidden');
-    setEl('forgot-otp-hint','OTP sent to '+email+' (check spam folder too)');
-    toast('OTP sent! Check inbox and spam folder.','success');
+    document.getElementById('forgot-step-success').classList.remove('hidden');
   }).catch(function(err){
-    btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> Send OTP';
-    toast(err.message||'Failed to send OTP','error');
+    btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> Send Reset Email';
+    if(err.code==='auth/user-not-found'){
+      document.getElementById('forgot-step-1').classList.add('hidden');
+      document.getElementById('forgot-step-success').classList.remove('hidden');
+    } else {
+      toast(err.message||'Failed to send reset email','error');
+    }
   });
 }
-
-function resetPassword(){
-  var boxes=document.querySelectorAll('#page-forgot .otp-box');
-  var otp='';for(var i=0;i<boxes.length;i++)otp+=boxes[i].value;
-  if(otp.length!==6){toast('Enter all 6 OTP digits','error');return;}
-  var np=gv('new-password');if(!np||np.length<6){toast('Password must be at least 6 characters','error');return;}
-  var btn=document.getElementById('reset-btn');
-  btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Resetting...';
-  api('/api/auth/reset-password',{method:'POST',body:JSON.stringify({email:window._forgotEmail,otp:otp,newPassword:np})}).then(function(){
-    btn.disabled=false;btn.innerHTML='<i class="fas fa-lock"></i> Reset Password';
-    toast('Password reset! Please login.','success');
-    document.getElementById('forgot-step-1').classList.remove('hidden');
-    document.getElementById('forgot-step-2').classList.add('hidden');
-    showPage('page-login');
-  }).catch(function(err){
-    btn.disabled=false;btn.innerHTML='<i class="fas fa-lock"></i> Reset Password';
-    toast(err.message||'Reset failed','error');
-  });
-}
-
-function otpMove(el,idx){el.value=el.value.replace(/\D/g,'');var all=document.querySelectorAll('#page-forgot .otp-box');if(el.value&&idx<all.length-1)all[idx+1].focus();}
-function otpBack(e,idx){var all=document.querySelectorAll('#page-forgot .otp-box');if(e.key==='Backspace'&&!all[idx].value&&idx>0)all[idx-1].focus();if(e.key==='Enter')resetPassword();}
 
 function updateNavUser(){
   if(!S.user)return;
@@ -910,6 +937,8 @@ function updateNavUser(){
 }
 
 function logout(){
+  var fbAuth=window._firebaseAuth;
+  if(fbAuth){import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){return m.signOut(fbAuth);}).catch(function(){});}
   api('/api/auth/logout',{method:'POST'}).catch(function(){});
   S.user=null;history.pushState({},'','/');
   showPage('page-home');loadHomeStats();loadHomeGallery();
@@ -920,6 +949,8 @@ function deleteAccount(){
   if(!confirm('DELETE YOUR ACCOUNT PERMANENTLY?\n\nThis will remove:\n- Your account\n- All your test results\n\nThis CANNOT be undone.'))return;
   if(!confirm('Are you absolutely sure? Type YES mentally and click OK only if sure.'))return;
   api('/api/auth/account',{method:'DELETE'}).then(function(){
+    var fbAuth=window._firebaseAuth;
+    if(fbAuth){import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){return m.signOut(fbAuth);}).catch(function(){});}
     toast('Account deleted permanently.','info',5000);
     S.user=null;history.pushState({},'','/');
     showPage('page-home');
@@ -1332,5 +1363,24 @@ function submitFeedback(){
 }
 </script>
 <script>(function(){var s=document.createElement('script');s.src='/socket.io/socket.io.js';s.async=true;document.body.appendChild(s);})();</script>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+// TODO: Replace with your Firebase project config from Firebase Console
+// Project settings → Your apps → Web app → firebaseConfig
+const firebaseConfig = {
+  apiKey: "AIzaSyDwOc-Fz6_tLwbUYByGNKgEdJwUYsdOJbQ",
+  authDomain: "aiits-afab1.firebaseapp.com",
+  projectId: "aiits-afab1",
+  storageBucket: "aiits-afab1.firebasestorage.app",
+  messagingSenderId: "164606422480",
+  appId: "1:164606422480:web:dbdefa47bcbec644125dd5",
+  measurementId: "G-D3P91118XP"
+};
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+window._firebaseAuth = auth;
+</script>
 </body>
 </html>

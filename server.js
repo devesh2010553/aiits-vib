@@ -2,6 +2,10 @@ require('dotenv').config();
 const REQUIRED = ['MONGODB_URI','ADMIN_EMAIL','ADMIN_PASSWORD'];
 const missing  = REQUIRED.filter(k=>!process.env[k]);
 if (missing.length) { console.error('[STARTUP] Missing env vars:', missing.join(', ')); process.exit(1); }
+if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON && !process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
+  console.error('[STARTUP] Missing FIREBASE_SERVICE_ACCOUNT_JSON env var');
+  process.exit(1);
+}
 if (!process.env.JWT_SECRET) { process.env.JWT_SECRET = require('crypto').randomBytes(64).toString('hex'); console.warn('[STARTUP] JWT_SECRET not set -- add to Render env!'); }
 
 const express      = require('express');
@@ -24,8 +28,6 @@ app.use(express.json({ limit:'20mb' }));
 app.use(express.urlencoded({ extended:true, limit:'20mb' }));
 app.use(cookieParser());
 app.use('/api/', rateLimit({ windowMs:15*60*1000, max:600 }));
-app.use('/api/auth/forgot-password', rateLimit({ windowMs:10*60*1000, max:5 }));
-app.use('/api/auth/login',           rateLimit({ windowMs: 5*60*1000, max:20 }));
 app.use('/api/auth/register',        rateLimit({ windowMs:60*60*1000, max:10 }));
 
 app.use(express.static(path.join(__dirname,'frontend'), {
@@ -38,9 +40,9 @@ app.use(express.static(path.join(__dirname,'frontend'), {
 app.get('/ping',   (_,res) => res.status(200).json({ status:'ok', ts:Date.now() }));
 app.get('/health', (_,res) => res.json({ status:'ok', uptime:process.uptime() }));
 app.get('/favicon.ico', (_,res) => res.status(204).end());
-app.get('/robots.txt', (_,res) => { res.type('text/plain'); res.send('User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: https://aiits-msc.onrender.com/sitemap.xml'); });
+app.get('/robots.txt', (_,res) => { res.type('text/plain'); res.send('User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: https://msc.aiits.workers.dev/sitemap.xml'); });
 app.get('/sitemap.xml', (_,res) => {
-  const base='https://aiits-msc.onrender.com', d=new Date().toISOString().split('T')[0];
+  const base='https://msc.aiits.workers.dev', d=new Date().toISOString().split('T')[0];
   res.type('application/xml');
   res.send('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>'+base+'/</loc><lastmod>'+d+'</lastmod><priority>1.0</priority></url><url><loc>'+base+'/register</loc><priority>0.8</priority></url><url><loc>'+base+'/login</loc><priority>0.7</priority></url></urlset>');
 });

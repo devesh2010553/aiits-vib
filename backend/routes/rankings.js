@@ -1,7 +1,7 @@
-const express = require('express');
-const router  = express.Router();
-const Result  = require('../models/Result');
-const User    = require('../models/User');
+const express     = require('express');
+const router      = express.Router();
+const Result      = require('../models/Result');
+const UserProfile = require('../models/UserProfile');
 const { authenticateStudent } = require('../middleware/auth');
 
 router.get('/test/:testId', authenticateStudent, async (req, res) => {
@@ -23,10 +23,8 @@ router.get('/test/:testId', authenticateStudent, async (req, res) => {
         myRank = above+1;
       }
     }
-    // Hide email from results for privacy - only show first letter + ***
     const sanitized = results.map((r,i) => {
       const obj = r.toObject();
-      // Mask email: show only first 2 chars + *** + @domain
       if (obj.userEmail) {
         const parts = obj.userEmail.split('@');
         obj.userEmail = parts[0].substring(0,2) + '***@' + (parts[1]||'');
@@ -42,14 +40,14 @@ router.get('/leaderboard', authenticateStudent, async (req, res) => {
     const batch = req.query.batch||'';
     const filter = { totalTests:{ $gt:0 } };
     if (batch) filter.batch = batch;
-    const users = await User.find(filter).select('name coachingName batch totalTests totalMarks highestMarks').sort({ totalMarks:-1, highestMarks:-1 }).limit(200);
+    const users = await UserProfile.find(filter).select('name coachingName batch totalTests totalMarks highestMarks').sort({ totalMarks:-1, highestMarks:-1 }).limit(200);
     res.json(users.map((u,i) => ({ ...u.toObject(), rank:i+1 })));
   } catch(err) { res.status(500).json({ error:err.message }); }
 });
 
 router.get('/top-performers', async (req, res) => {
   try {
-    const top = await User.find({ totalTests:{ $gt:0 } }).select('name coachingName batch totalMarks').sort({ totalMarks:-1 }).limit(10);
+    const top = await UserProfile.find({ totalTests:{ $gt:0 } }).select('name coachingName batch totalMarks').sort({ totalMarks:-1 }).limit(10);
     res.json(top.map((u,i) => ({ ...u.toObject(), rank:i+1 })));
   } catch(err) { res.status(500).json({ error:err.message }); }
 });
