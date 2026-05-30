@@ -88,9 +88,16 @@ app.get('*', async (req,res) => {
   };
   const fs = require('fs');
   let html = fs.readFileSync(path.join(__dirname,'frontend','index.html'),'utf8');
-  // Inject as the very first <script> tag so it runs before anything else reads it
-  const configScript = '<script>window.__FIREBASE_CONFIG__=' + JSON.stringify(firebaseConfig) + ';</script>';
-  html = html.replace('<script>', configScript + '<script>');
+  // Replace the placeholder module script with real Firebase config baked in
+  const fbCfg = JSON.stringify(firebaseConfig);
+  const newModuleScript =
+    '<script type="module">' +
+    'import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";' +
+    'import{getAuth}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";' +
+    'try{var a=initializeApp(' + fbCfg + ');window._firebaseAuth=getAuth(a);}' +
+    'catch(e){console.error("Firebase init failed:",e);}' +
+    '</script>';
+  html = html.replace('<script type="module">/* FIREBASE_CONFIG_PLACEHOLDER */</script>', newModuleScript);
   res.setHeader('Content-Type','text/html');
   res.send(html);
 });
