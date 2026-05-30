@@ -76,9 +76,9 @@ app.get('*', async (req,res) => {
   };
   const fs = require('fs');
   let html = fs.readFileSync(path.join(__dirname,'frontend','index.html'),'utf8');
-  const placeholder = '<script>' + String.fromCharCode(10) + '// Firebase config is injected by server from environment variables' + String.fromCharCode(10) + '// See server.js — GET / injects window.__FIREBASE_CONFIG__' + String.fromCharCode(10) + '</script>';
-  const configScript = '<script>window.__FIREBASE_CONFIG__ = ' + JSON.stringify(firebaseConfig) + ';</script>';
-  html = html.replace(placeholder, configScript);
+  // Inject config right before </body> — works regardless of what else is in the file
+  const configScript = '<script>window.__FIREBASE_CONFIG__=' + JSON.stringify(firebaseConfig) + ';</script>';
+  html = html.replace('</body>', configScript + '</body>');
   res.setHeader('Content-Type','text/html');
   res.send(html);
 });

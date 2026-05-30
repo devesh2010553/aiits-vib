@@ -835,7 +835,7 @@ window.addEventListener('load',function(){
   },50);
   var resumeId=new URLSearchParams(window.location.search).get('resume');
   if(resumeId)window._pendingResume=resumeId;
-  setTimeout(function(){try{if(typeof io!=='undefined')socket=io({withCredentials:true});}catch(e){}},1500);
+  setTimeout(function(){try{if(typeof io!=='undefined')socket=io({withCredentials:true,transports:['polling']});}catch(e){}},1500);
   if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(function(){});
 });
 
@@ -1460,7 +1460,6 @@ function submitFeedback(){
   toast('Please send your feedback on Instagram @xavier06444','info',5000);
   var el=document.getElementById('feedback-text');if(el)el.value='';
 }
-</script>
 
 function toggleEditProfile(){
   var f=document.getElementById('edit-profile-form');
@@ -1553,6 +1552,7 @@ function savePassword(){
     toast(err.message||'Password change failed','error');
   });
 }
+</script>
 
 <script>(function(){var s=document.createElement('script');s.src='/socket.io/socket.io.js';s.async=true;document.body.appendChild(s);})();</script>
 
