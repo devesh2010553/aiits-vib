@@ -814,7 +814,7 @@ function api(url,opts){
       return res.json().then(function(data){if(!res.ok)throw new Error(data.error||('HTTP '+res.status));return data;});
     });
   }
-  return firebaseUser.getIdToken().then(function(idToken){
+  return firebaseUser.getIdToken(false).then(function(idToken){
     return fetch(url,{credentials:'include',headers:Object.assign({'Content-Type':'application/json','Authorization':'Bearer '+idToken},opts.headers||{}),method:opts.method||'GET',body:opts.body||undefined});
   }).then(function(res){
     return res.json().then(function(data){if(!res.ok)throw new Error(data.error||('HTTP '+res.status));return data;});
@@ -826,13 +826,7 @@ window.addEventListener('load',function(){
   var ls=document.getElementById('loading-screen');
   if(ls){setTimeout(function(){ls.style.opacity='0';setTimeout(function(){ls.style.display='none';},420);},300);}
   loadHomeStats();loadHomeGallery();
-  // Firebase module scripts are deferred — wait up to 3s for _firebaseAuth to be set
-  var authWaitMs=0;
-  var authWaitInterval=setInterval(function(){
-    authWaitMs+=50;
-    if(window._firebaseAuth){clearInterval(authWaitInterval);checkAuth();return;}
-    if(authWaitMs>=3000){clearInterval(authWaitInterval);checkAuth();}  // timeout fallback
-  },50);
+  checkAuth();
   var resumeId=new URLSearchParams(window.location.search).get('resume');
   if(resumeId)window._pendingResume=resumeId;
   setTimeout(function(){try{if(typeof io!=='undefined')socket=io({withCredentials:true,transports:['polling']});}catch(e){}},1500);
@@ -848,29 +842,27 @@ function checkAuth(){
     else showPage('page-home');
     return;
   }
-  import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){
-    m.onAuthStateChanged(fbAuth,function(firebaseUser){
-      if(!firebaseUser){
-        if(path==='/register')showPage('page-register');
-        else if(path==='/login')showPage('page-login');
-        else{showPage('page-home');loadHomeStats();}
-        return;
+  fbAuth.onAuthStateChanged(function(firebaseUser){
+    if(!firebaseUser){
+      if(path==='/register')showPage('page-register');
+      else if(path==='/login')showPage('page-login');
+      else{showPage('page-home');loadHomeStats();}
+      return;
+    }
+    firebaseUser.getIdToken().then(function(idToken){
+      return fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+idToken}}).then(function(r){return r.json();});
+    }).then(function(r){
+      if(r&&r.user){
+        S.user=r.user;updateNavUser();showPage('page-dashboard');loadDashboard();
+        var rp=new URLSearchParams(window.location.search).get('resume');
+        if(rp){history.replaceState({},'/','/');setTimeout(function(){initiateTest(rp);},900);}
+      } else {
+        showPage('page-register');
       }
-      firebaseUser.getIdToken().then(function(idToken){
-        return fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+idToken}}).then(function(r){return r.json();});
-      }).then(function(r){
-        if(r&&r.user){
-          S.user=r.user;updateNavUser();showPage('page-dashboard');loadDashboard();
-          var rp=new URLSearchParams(window.location.search).get('resume');
-          if(rp){history.replaceState({},'','/');setTimeout(function(){initiateTest(rp);},900);}
-        } else {
-          showPage('page-register');
-        }
-      }).catch(function(){
-        if(path==='/register')showPage('page-register');
-        else if(path==='/login')showPage('page-login');
-        else showPage('page-home');
-      });
+    }).catch(function(){
+      if(path==='/register')showPage('page-register');
+      else if(path==='/login')showPage('page-login');
+      else showPage('page-home');
     });
   });
 }
@@ -932,13 +924,11 @@ function handleRegister(e){
   btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Creating...';
   var fbAuth=window._firebaseAuth;
   if(!fbAuth){toast('Firebase not loaded. Please refresh.','error');btn.disabled=false;btn.innerHTML='<i class="fas fa-user-plus"></i> Create Account';return;}
-  import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){
-    return m.createUserWithEmailAndPassword(fbAuth,email,password);
-  }).then(function(cred){
+  fbAuth.createUserWithEmailAndPassword(email,password).then(function(cred){
     return cred.user.getIdToken().then(function(idToken){
       var payload={idToken:idToken,name:gv('reg-name'),phone:gv('reg-phone'),coachingName:gv('reg-coaching'),fatherName:gv('reg-father'),fatherOccupation:gv('reg-occupation'),whatsappNumber:gv('reg-whatsapp'),batch:batch};
       return fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(res){
-        return res.json().then(function(data){if(!res.ok){cred.user.delete().catch(function(){});throw new Error(data.error||'Registration failed');}return data;});
+        return res.json().then(function(data){if(!res.ok){if(cred&&cred.user)cred.user.delete().catch(function(){});throw new Error(data.error||'Registration failed');}return data;});
       });
     });
   }).then(function(r){
@@ -962,9 +952,9 @@ function handleLogin(){
   if(!fbAuth){toast('Firebase not loaded. Please refresh.','error');btn.disabled=false;btn.innerHTML='<i class="fas fa-sign-in-alt"></i> Login';return;}
   var loginPromise;
   if(id.includes('@')){
-    loginPromise=import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){return m.signInWithEmailAndPassword(fbAuth,id,pw);});
+    loginPromise=fbAuth.signInWithEmailAndPassword(id,pw);
   } else {
-    loginPromise=fetch('/api/auth/lookup-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:id})}).then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.error||'Account not found');return d.email;});}).then(function(email){return import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){return m.signInWithEmailAndPassword(fbAuth,email,pw);});});
+    loginPromise=fetch('/api/auth/lookup-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:id})}).then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.error||'Account not found');return d.email;});}).then(function(email){return fbAuth.signInWithEmailAndPassword(email,pw);});
   }
   loginPromise.then(function(cred){
     return cred.user.getIdToken().then(function(idToken){
@@ -1007,9 +997,7 @@ function sendForgotOtp(){
     }
     // Email exists and within limit — send reset email via Firebase
     btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Sending...';
-    import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){
-      return m.sendPasswordResetEmail(fbAuth,email);
-    }).then(function(){
+    fbAuth.sendPasswordResetEmail(email).then(function(){
       btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> Send Reset Email';
       document.getElementById('forgot-step-1').classList.add('hidden');
       document.getElementById('forgot-step-success').classList.remove('hidden');
@@ -1037,7 +1025,7 @@ function updateNavUser(){
 
 function logout(){
   var fbAuth=window._firebaseAuth;
-  if(fbAuth){import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){return m.signOut(fbAuth);}).catch(function(){});}
+  if(fbAuth){fbAuth.signOut().catch(function(){});}
   api('/api/auth/logout',{method:'POST'}).catch(function(){});
   S.user=null;history.pushState({},'','/');
   showPage('page-home');loadHomeStats();loadHomeGallery();
@@ -1049,7 +1037,7 @@ function deleteAccount(){
   if(!confirm('Are you absolutely sure? Type YES mentally and click OK only if sure.'))return;
   api('/api/auth/account',{method:'DELETE'}).then(function(){
     var fbAuth=window._firebaseAuth;
-    if(fbAuth){import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){return m.signOut(fbAuth);}).catch(function(){});}
+    if(fbAuth){fbAuth.signOut().catch(function(){});}
     toast('Account deleted permanently.','info',5000);
     S.user=null;history.pushState({},'','/');
     showPage('page-home');

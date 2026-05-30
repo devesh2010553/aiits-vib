@@ -88,16 +88,13 @@ app.get('*', async (req,res) => {
   };
   const fs = require('fs');
   let html = fs.readFileSync(path.join(__dirname,'frontend','index.html'),'utf8');
-  // Replace the placeholder module script with real Firebase config baked in
+  // Inject Firebase as regular (non-module) scripts so they run before onload
   const fbCfg = JSON.stringify(firebaseConfig);
-  const newModuleScript =
-    '<script type="module">' +
-    'import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";' +
-    'import{getAuth}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";' +
-    'try{var a=initializeApp(' + fbCfg + ');window._firebaseAuth=getAuth(a);}' +
-    'catch(e){console.error("Firebase init failed:",e);}' +
-    '</script>';
-  html = html.replace('<script type="module">/* FIREBASE_CONFIG_PLACEHOLDER */</script>', newModuleScript);
+  const firebaseScripts =
+    '<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>' +
+    '<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>' +
+    '<script>try{var __fbApp=firebase.initializeApp(' + fbCfg + ');window._firebaseAuth=firebase.auth(__fbApp);console.log("[AIITS] Firebase ready");}catch(e){console.error("Firebase init failed:",e);}</script>';
+  html = html.replace('<script type="module">/* FIREBASE_CONFIG_PLACEHOLDER */</script>', firebaseScripts);
   res.setHeader('Content-Type','text/html');
   res.send(html);
 });
