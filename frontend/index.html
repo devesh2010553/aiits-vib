@@ -9,12 +9,36 @@
 <meta name="robots" content="index,follow">
 <meta property="og:title" content="AIITS - All India Topicwise Test Series by MS Chauhan">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://msc.aiits.workers.dev">
+<meta property="og:url" content="https://aiits-msc.onrender.com">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#b8860b">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="AIITS">
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3517811725655802" crossorigin="anonymous"></script>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script>
+// Load Firebase config from server (keys stay in Render env vars, never in HTML)
+window._firebaseReady = false;
+fetch('/api/auth/firebase-config')
+  .then(function(r) { return r.json(); })
+  .then(function(cfg) {
+    if (cfg.error) {
+      console.error('[FIREBASE] Config missing:', cfg.error);
+      document.dispatchEvent(new CustomEvent('firebase-fail', { detail: cfg.error }));
+      return;
+    }
+    firebase.initializeApp(cfg);
+    window._firebaseReady = true;
+    document.dispatchEvent(new Event('firebase-ready'));
+    console.log('[FIREBASE] Ready');
+  })
+  .catch(function(e) {
+    console.error('[FIREBASE] Load failed:', e.message);
+    document.dispatchEvent(new Event('firebase-fail'));
+  });
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -475,23 +499,19 @@ textarea{resize:vertical}
 
 <!-- FORGOT PASSWORD PAGE -->
 <div id="page-forgot" class="page">
-  <div class="auth-box">
+  <div class="auth-layout">
+    <div class="auth-panel-left"><div class="auth-brand"><div class="auth-logo">AIITS</div><p>Reset Password</p></div></div>
+    <div class="auth-panel-right">
       <button class="back-btn" onclick="showPage('page-login')"><i class="fas fa-arrow-left"></i> Back</button>
-      <h2 class="auth-title">Reset Password</h2>
+      <h2 class="auth-title">Forgot Password</h2>
       <div id="forgot-step-1">
-        <p class="auth-sub">Enter your registered email — a reset link will be sent directly to your inbox. No OTP needed.</p>
+        <p class="auth-sub">Enter your email. Firebase will send a reset link directly to your inbox.</p>
         <div class="fg"><label>Email Address</label><input type="email" id="forgot-email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')sendForgotOtp()"></div>
         <button class="btn btn-gold btn-full" style="margin-top:14px" onclick="sendForgotOtp()" id="forgot-btn"><i class="fas fa-paper-plane"></i> Send Reset Email</button>
       </div>
-      <div id="forgot-step-success" class="hidden" style="text-align:center;padding:20px 0">
-        <div style="font-size:48px;margin-bottom:12px">📧</div>
-        <p style="font-weight:600;margin-bottom:8px">Check your inbox!</p>
-        <p class="auth-sub">A password reset link has been sent to your email.<br>Click the link to set a new password.<br><br><small style="opacity:0.7">Check spam folder if you don't see it within a minute.</small></p>
-        <button class="btn btn-outline btn-full" style="margin-top:20px" onclick="showPage('page-login')">Back to Login</button>
-        <p class="auth-switch" style="margin-top:12px">Didn't get it? <a onclick="document.getElementById('forgot-step-success').classList.add('hidden');document.getElementById('forgot-step-1').classList.remove('hidden')">Try again</a></p>
-      </div>
+      <!-- Firebase handles password reset via email link - no OTP step needed -->
+    </div>
   </div>
-</div>
 </div>
 
 <!-- STUDENT DASHBOARD -->
@@ -734,66 +754,58 @@ function toast(msg,type,dur){
 
 function api(url,opts){
   opts=opts||{};
-  var firebaseUser=window._firebaseAuth&&window._firebaseAuth.currentUser;
-  if(!firebaseUser){
-    return fetch(url,{credentials:'include',headers:Object.assign({'Content-Type':'application/json'},opts.headers||{}),method:opts.method||'GET',body:opts.body||undefined}).then(function(res){
-      return res.json().then(function(data){if(!res.ok)throw new Error(data.error||('HTTP '+res.status));return data;});
-    });
-  }
-  return firebaseUser.getIdToken().then(function(idToken){
-    return fetch(url,{credentials:'include',headers:Object.assign({'Content-Type':'application/json','Authorization':'Bearer '+idToken},opts.headers||{}),method:opts.method||'GET',body:opts.body||undefined});
-  }).then(function(res){
+  return fetch(url,{credentials:'include',headers:Object.assign({'Content-Type':'application/json'},opts.headers||{}),method:opts.method||'GET',body:opts.body||undefined}).then(function(res){
     return res.json().then(function(data){if(!res.ok)throw new Error(data.error||('HTTP '+res.status));return data;});
   });
 }
 
-window.addEventListener('load',function(){
+window.addEventListener('load', function() {
   showPage('page-home');
-  var ls=document.getElementById('loading-screen');
-  if(ls){setTimeout(function(){ls.style.opacity='0';setTimeout(function(){ls.style.display='none';},420);},300);}
-  loadHomeStats();loadHomeGallery();checkAuth();
-  var resumeId=new URLSearchParams(window.location.search).get('resume');
-  if(resumeId)window._pendingResume=resumeId;
-  setTimeout(function(){try{if(typeof io!=='undefined')socket=io({withCredentials:true});}catch(e){}},1500);
-  if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(function(){});
+  var ls = document.getElementById('loading-screen');
+  if (ls) { setTimeout(function() { ls.style.opacity='0'; setTimeout(function() { ls.style.display='none'; }, 420); }, 300); }
+  loadHomeStats(); loadHomeGallery();
+  var resumeId = new URLSearchParams(window.location.search).get('resume');
+  if (resumeId) window._pendingResume = resumeId;
+  setTimeout(function() { try { if (typeof io !== 'undefined') socket = io({ withCredentials: true }); } catch(e) {} }, 1500);
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});
+  // Wait for Firebase to be ready before checking auth
+  if (window._firebaseReady) {
+    checkAuth();
+  } else {
+    document.addEventListener('firebase-ready', function() { checkAuth(); });
+    // Fallback: if firebase-ready never fires (config missing), still show home
+    setTimeout(function() { if (!S.user) { showPage('page-home'); loadHomeStats(); } }, 4000);
+  }
 });
 
-function checkAuth(){
-  var path=window.location.pathname;
-  var fbAuth=window._firebaseAuth;
-  if(!fbAuth){
-    if(path==='/register')showPage('page-register');
-    else if(path==='/login')showPage('page-login');
-    else showPage('page-home');
-    return;
-  }
-  import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){
-    m.onAuthStateChanged(fbAuth,function(firebaseUser){
-      if(!firebaseUser){
-        if(path==='/register')showPage('page-register');
-        else if(path==='/login')showPage('page-login');
-        else{showPage('page-home');loadHomeStats();}
-        return;
-      }
-      firebaseUser.getIdToken().then(function(idToken){
-        return fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+idToken}}).then(function(r){return r.json();});
-      }).then(function(r){
-        if(r&&r.user){
-          S.user=r.user;updateNavUser();showPage('page-dashboard');loadDashboard();
-          var rp=new URLSearchParams(window.location.search).get('resume');
-          if(rp){history.replaceState({},'','/');setTimeout(function(){initiateTest(rp);},900);}
-        } else {
-          showPage('page-register');
+function checkAuth() {
+  var path = window.location.pathname;
+  // Check if Firebase has a current user
+  whenFirebaseReady(function() { firebase.auth().onAuthStateChanged(function(fbUser) {
+    if (fbUser) {
+      // Get fresh token and verify with backend
+      fbUser.getIdToken().then(function(idToken) {
+        return api('/api/auth/verify-token', { method: 'POST', body: JSON.stringify({ idToken: idToken }) });
+      }).then(function(r) {
+        if (r && r.user) {
+          S.user = r.user; updateNavUser(); showPage('page-dashboard'); loadDashboard();
+          startTokenRefresh();
+          var rp = new URLSearchParams(window.location.search).get('resume');
+          if (rp) { history.replaceState({}, '', '/'); setTimeout(function() { initiateTest(rp); }, 900); }
         }
-      }).catch(function(){
-        if(path==='/register')showPage('page-register');
-        else if(path==='/login')showPage('page-login');
-        else showPage('page-home');
+      }).catch(function() {
+        fbAuth().signOut().catch(function(){});
+        if (path === '/register') showPage('page-register');
+        else if (path === '/login') showPage('page-login');
+        else { showPage('page-home'); loadHomeStats(); }
       });
-    });
-  });
+    } else {
+      if (path === '/register') showPage('page-register');
+      else if (path === '/login') showPage('page-login');
+      else { showPage('page-home'); loadHomeStats(); }
+    }
+  }); }); // end onAuthStateChanged + whenFirebaseReady
 }
-
 function loadHomeStats(){
   fetch('/api/rankings/top-performers').then(function(r){return r.json();}).then(function(top){
     var el=document.getElementById('home-preview-ranks');
@@ -840,90 +852,165 @@ function selectBatch(b){
   ['11','12','dropper'].forEach(function(x){var el=document.getElementById('bopt-'+x);if(el)el.className='batch-opt'+(x===b?' selected-'+x:'');});
 }
 
-function handleRegister(e){
+function handleRegister(e) {
   e.preventDefault();
-  var batch=gv('reg-batch');
-  if(!batch){toast('Please select your batch','error');return;}
-  var email=gv('reg-email'),password=gv('reg-password');
-  if(!email||!password){toast('Email and password required','error');return;}
-  if(password.length<6){toast('Password must be at least 6 characters','error');return;}
-  var btn=document.getElementById('reg-btn');
-  btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Creating...';
-  var fbAuth=window._firebaseAuth;
-  if(!fbAuth){toast('Firebase not loaded. Please refresh.','error');btn.disabled=false;btn.innerHTML='<i class="fas fa-user-plus"></i> Create Account';return;}
-  import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){
-    return m.createUserWithEmailAndPassword(fbAuth,email,password);
-  }).then(function(cred){
-    return cred.user.getIdToken().then(function(idToken){
-      var payload={idToken:idToken,name:gv('reg-name'),phone:gv('reg-phone'),coachingName:gv('reg-coaching'),fatherName:gv('reg-father'),fatherOccupation:gv('reg-occupation'),whatsappNumber:gv('reg-whatsapp'),batch:batch};
-      return fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(res){
-        return res.json().then(function(data){if(!res.ok){cred.user.delete().catch(function(){});throw new Error(data.error||'Registration failed');}return data;});
-      });
-    });
-  }).then(function(r){
-    btn.disabled=false;btn.innerHTML='<i class="fas fa-user-plus"></i> Create Account';
-    S.user=r.user;updateNavUser();toast('Welcome, '+r.user.name+'!','success');
-    showPage('page-dashboard');loadDashboard();
-    if(window._pendingResume){var rid=window._pendingResume;window._pendingResume=null;setTimeout(function(){initiateTest(rid);},900);}
-  }).catch(function(err){
-    btn.disabled=false;btn.innerHTML='<i class="fas fa-user-plus"></i> Create Account';
-    var map={'auth/email-already-in-use':'Email already registered. Try logging in.','auth/weak-password':'Password must be at least 6 characters.','auth/invalid-email':'Invalid email address.'};
-    toast(map[err.code]||err.message||'Registration failed','error');
+  var batch = gv('reg-batch');
+  if (!batch) { toast('Please select your batch', 'error'); return; }
+  var btn = document.getElementById('reg-btn');
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+  var email    = gv('reg-email');
+  var password = gv('reg-password');
+  var payload  = {
+    name: gv('reg-name'), email: email, phone: gv('reg-phone'),
+    password: password, coachingName: gv('reg-coaching'),
+    fatherName: gv('reg-father'), fatherOccupation: gv('reg-occupation'),
+    whatsappNumber: gv('reg-whatsapp'), batch: batch
+  };
+  // Step 1: Create user profile in backend (creates Firebase Auth user too)
+  api('/api/auth/register', { method: 'POST', body: JSON.stringify(payload) }).then(function() {
+    // Step 2: Sign in with Firebase to get idToken
+    return fbAuth().signInWithEmailAndPassword(email, password);
+  }).then(function(cred) {
+    return cred.user.getIdToken();
+  }).then(function(idToken) {
+    // Step 3: Send idToken to backend to set cookie + get profile
+    return api('/api/auth/verify-token', { method: 'POST', body: JSON.stringify({ idToken: idToken }) });
+  }).then(function(r) {
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
+    S.user = r.user; updateNavUser();
+    toast('Welcome, ' + r.user.name + '!', 'success');
+    showPage('page-dashboard'); loadDashboard();
+    startTokenRefresh();
+  }).catch(function(err) {
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
+    var msg = err.message || 'Registration failed';
+    if (msg.includes('auth/weak-password')) msg = 'Password must be at least 6 characters';
+    if (msg.includes('auth/email-already-in-use')) msg = 'Email already registered. Please login.';
+    toast(msg, 'error');
   });
 }
+function handleLogin() {
+  var identifier = gv('login-id'), password = gv('login-pw');
+  if (!identifier || !password) { toast('Enter email/phone and password', 'error'); return; }
+  var btn = document.getElementById('login-btn');
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
 
-function handleLogin(){
-  var id=gv('login-id'),pw=gv('login-pw');
-  if(!id||!pw){toast('Enter email/phone and password','error');return;}
-  var btn=document.getElementById('login-btn');
-  btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Logging in...';
-  var fbAuth=window._firebaseAuth;
-  if(!fbAuth){toast('Firebase not loaded. Please refresh.','error');btn.disabled=false;btn.innerHTML='<i class="fas fa-sign-in-alt"></i> Login';return;}
+  // If identifier looks like phone number, find email first
   var loginPromise;
-  if(id.includes('@')){
-    loginPromise=import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){return m.signInWithEmailAndPassword(fbAuth,id,pw);});
+  if (identifier.match(/^[0-9+\s-]{8,15}$/)) {
+    // Phone login: get email from backend first
+    loginPromise = fetch('/api/auth/email-by-phone?phone=' + encodeURIComponent(identifier))
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error || !d.email) throw new Error('No account with this phone number');
+        return firebase.auth().signInWithEmailAndPassword(d.email, password);
+      });
   } else {
-    loginPromise=fetch('/api/auth/lookup-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:id})}).then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.error||'Account not found');return d.email;});}).then(function(email){return import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){return m.signInWithEmailAndPassword(fbAuth,email,pw);});});
+    loginPromise = fbAuth().signInWithEmailAndPassword(identifier, password);
   }
-  loginPromise.then(function(cred){
-    return cred.user.getIdToken().then(function(idToken){
-      return fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+idToken}}).then(function(r){return r.json();});
-    });
-  }).then(function(r){
-    btn.disabled=false;btn.innerHTML='<i class="fas fa-sign-in-alt"></i> Login';
-    S.user=r.user;updateNavUser();toast('Welcome back, '+r.user.name+'!','success');
-    showPage('page-dashboard');loadDashboard();
-    if('serviceWorker' in navigator)navigator.serviceWorker.ready.then(function(reg){setupPush(reg);}).catch(function(){});
-    if(window._pendingResume){var rid=window._pendingResume;window._pendingResume=null;setTimeout(function(){initiateTest(rid);},900);}
-  }).catch(function(err){
-    btn.disabled=false;btn.innerHTML='<i class="fas fa-sign-in-alt"></i> Login';
-    var map={'auth/user-not-found':'No account found. Please register.','auth/wrong-password':'Incorrect password.','auth/invalid-credential':'Invalid email or password.','auth/too-many-requests':'Too many attempts. Please wait.','auth/invalid-email':'Invalid email address.'};
-    toast(map[err.code]||err.message||'Login failed','error');
+
+  loginPromise.then(function(cred) {
+    return cred.user.getIdToken();
+  }).then(function(idToken) {
+    return api('/api/auth/verify-token', { method: 'POST', body: JSON.stringify({ idToken: idToken }) });
+  }).then(function(r) {
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+    S.user = r.user; updateNavUser();
+    toast('Welcome back, ' + r.user.name + '!', 'success');
+    showPage('page-dashboard'); loadDashboard();
+    startTokenRefresh();
+    if (window._pendingResume) { var rid = window._pendingResume; window._pendingResume = null; setTimeout(function() { initiateTest(rid); }, 900); }
+  }).catch(function(err) {
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+    var msg = err.message || 'Login failed';
+    if (msg.includes('auth/user-not-found') || msg.includes('auth/invalid-credential')) msg = 'Account not found or wrong password.';
+    if (msg.includes('auth/wrong-password')) msg = 'Incorrect password. Please try again.';
+    if (msg.includes('auth/too-many-requests')) msg = 'Too many attempts. Try again in a few minutes.';
+    if (msg.includes('auth/invalid-email')) msg = 'Invalid email address.';
+    toast(msg, 'error');
+  });
+}
+function sendForgotOtp() {
+  var email = gv('forgot-email');
+  if (!email) { toast('Enter your email address', 'error'); return; }
+  var btn = document.getElementById('forgot-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+  fbAuth().sendPasswordResetEmail(email, {
+    url: window.location.origin + '/login',
+    handleCodeInApp: false
+  }).then(function() {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Reset Email';
+    toast('Password reset email sent! Check inbox and spam folder.', 'success', 6000);
+    showForgotSuccess(email);
+  }).catch(function(err) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Reset Email';
+    var msg = err.message || 'Failed to send email';
+    if (msg.indexOf('auth/user-not-found') !== -1 || msg.indexOf('auth/invalid-email') !== -1)
+      msg = 'No account found with this email address.';
+    if (msg.indexOf('auth/too-many-requests') !== -1)
+      msg = 'Too many requests. Please wait a few minutes.';
+    toast(msg, 'error');
   });
 }
 
-function sendForgotOtp(){
-  var email=gv('forgot-email');if(!email){toast('Enter your email','error');return;}
-  var btn=document.getElementById('forgot-btn');
-  btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Sending...';
-  var fbAuth=window._firebaseAuth;
-  if(!fbAuth){toast('Firebase not loaded. Please refresh.','error');btn.disabled=false;return;}
-  import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){
-    return m.sendPasswordResetEmail(fbAuth,email);
-  }).then(function(){
-    btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> Send Reset Email';
-    document.getElementById('forgot-step-1').classList.add('hidden');
-    document.getElementById('forgot-step-success').classList.remove('hidden');
-  }).catch(function(err){
-    btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> Send Reset Email';
-    if(err.code==='auth/user-not-found'){
-      document.getElementById('forgot-step-1').classList.add('hidden');
-      document.getElementById('forgot-step-success').classList.remove('hidden');
-    } else {
-      toast(err.message||'Failed to send reset email','error');
-    }
-  });
+function showForgotSuccess(email) {
+  var step1 = document.getElementById('forgot-step-1');
+  if (!step1) return;
+  var div = document.createElement('div');
+  div.style.textAlign = 'center';
+  div.style.padding   = '20px';
+  var icon = document.createElement('i');
+  icon.className = 'fas fa-check-circle';
+  icon.style.cssText = 'font-size:48px;color:var(--green);display:block;margin-bottom:14px';
+  var h3 = document.createElement('h3');
+  h3.style.marginBottom = '8px';
+  h3.textContent = 'Email Sent!';
+  var p1 = document.createElement('p');
+  p1.style.cssText = 'color:var(--text-muted);font-size:14px;margin-bottom:16px';
+  p1.innerHTML = 'A password reset link has been sent to <strong>' + esc(email) + '</strong>.<br>Click the link in the email to set a new password.';
+  var p2 = document.createElement('p');
+  p2.style.cssText = 'font-size:12px;color:var(--text-muted)';
+  p2.textContent = 'Check your spam folder if you do not see it.';
+  var backBtn = document.createElement('button');
+  backBtn.className = 'btn btn-outline';
+  backBtn.style.marginTop = '16px';
+  backBtn.innerHTML = '<i class="fas fa-arrow-left"></i> Back to Login';
+  backBtn.addEventListener('click', function() { showPage('page-login'); });
+  div.appendChild(icon); div.appendChild(h3); div.appendChild(p1); div.appendChild(p2); div.appendChild(backBtn);
+  step1.innerHTML = '';
+  step1.appendChild(div);
 }
+function resetPassword() {
+  // Not used - Firebase sends email link that handles password reset
+  // This function kept for compatibility
+  toast('Please use the link sent to your email to reset password', 'info');
+}
+// Auto-refresh Firebase token before it expires (every 55 min)
+function startTokenRefresh() {
+  if (window._tokenRefreshIv) clearInterval(window._tokenRefreshIv);
+  window._tokenRefreshIv = setInterval(function() {
+    var fbUser = firebase.auth ? firebase.auth().currentUser : null;
+    if (!fbUser) return;
+    fbUser.getIdToken(true).then(function(newToken) {
+      api('/api/auth/refresh-token', { method: 'POST', body: JSON.stringify({ idToken: newToken }) }).catch(function(){});
+    }).catch(function(){});
+  }, 55 * 60 * 1000);
+}
+// Listen for Firebase auth state changes
+whenFirebaseReady(function() { firebase.auth().onAuthStateChanged(function(fbUser) {
+  if (!fbUser && S.user) {
+    // Firebase session ended - logout
+    S.user = null;
+    showPage('page-home');
+  }
+});});
+
+
+function otpMove(el,idx){el.value=el.value.replace(/\D/g,'');var all=document.querySelectorAll('#page-forgot .otp-box');if(el.value&&idx<all.length-1)all[idx+1].focus();}
+function otpBack(e,idx){var all=document.querySelectorAll('#page-forgot .otp-box');if(e.key==='Backspace'&&!all[idx].value&&idx>0)all[idx-1].focus();if(e.key==='Enter')resetPassword();}
 
 function updateNavUser(){
   if(!S.user)return;
@@ -936,21 +1023,20 @@ function updateNavUser(){
   if(pi)pi.innerHTML='<strong>Name:</strong> '+esc(S.user.name)+'<br><strong>Email:</strong> '+esc(S.user.email)+'<br><strong>Phone:</strong> '+esc(S.user.phone||'--')+'<br><strong>Batch:</strong> '+(bMap&&bMap[S.user.batch]||S.user.batch)+'<br><strong>Coaching:</strong> '+esc(S.user.coachingName||'--');
 }
 
-function logout(){
-  var fbAuth=window._firebaseAuth;
-  if(fbAuth){import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){return m.signOut(fbAuth);}).catch(function(){});}
-  api('/api/auth/logout',{method:'POST'}).catch(function(){});
-  S.user=null;history.pushState({},'','/');
-  showPage('page-home');loadHomeStats();loadHomeGallery();
-  toast('Logged out','info');
+function logout() {
+  api('/api/auth/logout', { method: 'POST' }).catch(function(){});
+  firebase.auth().signOut().catch(function(){});
+  if (window._tokenRefreshIv) { clearInterval(window._tokenRefreshIv); window._tokenRefreshIv = null; }
+  S.user = null;
+  history.pushState({}, '', '/');
+  showPage('page-home'); loadHomeStats(); loadHomeGallery();
+  toast('Logged out', 'info');
 }
 
 function deleteAccount(){
   if(!confirm('DELETE YOUR ACCOUNT PERMANENTLY?\n\nThis will remove:\n- Your account\n- All your test results\n\nThis CANNOT be undone.'))return;
   if(!confirm('Are you absolutely sure? Type YES mentally and click OK only if sure.'))return;
   api('/api/auth/account',{method:'DELETE'}).then(function(){
-    var fbAuth=window._firebaseAuth;
-    if(fbAuth){import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(function(m){return m.signOut(fbAuth);}).catch(function(){});}
     toast('Account deleted permanently.','info',5000);
     S.user=null;history.pushState({},'','/');
     showPage('page-home');
@@ -1363,24 +1449,5 @@ function submitFeedback(){
 }
 </script>
 <script>(function(){var s=document.createElement('script');s.src='/socket.io/socket.io.js';s.async=true;document.body.appendChild(s);})();</script>
-
-<script type="module">
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-// TODO: Replace with your Firebase project config from Firebase Console
-// Project settings → Your apps → Web app → firebaseConfig
-const firebaseConfig = {
-  apiKey: "AIzaSyDwOc-Fz6_tLwbUYByGNKgEdJwUYsdOJbQ",
-  authDomain: "aiits-afab1.firebaseapp.com",
-  projectId: "aiits-afab1",
-  storageBucket: "aiits-afab1.firebasestorage.app",
-  messagingSenderId: "164606422480",
-  appId: "1:164606422480:web:dbdefa47bcbec644125dd5",
-  measurementId: "G-D3P91118XP"
-};
-const app  = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-window._firebaseAuth = auth;
-</script>
 </body>
 </html>

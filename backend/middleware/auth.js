@@ -1,49 +1,49 @@
-const admin       = require('../utils/firebaseAdmin');
-const UserProfile = require('../models/UserProfile');
-const jwt         = require('jsonwebtoken');
+const User = require('../models/User');
+const { verifyIdToken } = require('../utils/firebase');
 
+// Student auth: verify Firebase ID token from cookie or Authorization header
 exports.authenticateStudent = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization || '';
-    const token = authHeader.startsWith('Bearer ')
-      ? authHeader.slice(7)
-      : req.cookies.studentToken;
-
+    const token = req.cookies.firebaseToken ||
+                  (req.headers.authorization || '').replace('Bearer ', '').trim();
     if (!token) return res.status(401).json({ error: 'Authentication required. Please login.' });
 
-    const decoded = await admin.auth().verifyIdToken(token);
+    // Verify with Firebase Admin SDK
+    const decoded = await verifyIdToken(token);
 
-    const profile = await UserProfile.findOne({ uid: decoded.uid });
-    if (!profile) return res.status(401).json({ error: 'Profile not found. Please register again.' });
+    // Get extra profile from MongoDB using Firebase UID
+    const user = await User.findOne({ firebaseUid: decoded.uid });
+    if (!user) return res.status(401).json({ error: 'Profile not found. Please complete registration.' });
 
-    req.user = {
-      _id:              profile._id,
-      uid:              decoded.uid,
-      name:             profile.name,
-      email:            decoded.email,
-      phone:            profile.phone,
-      batch:            profile.batch,
-      coachingName:     profile.coachingName,
-      fatherName:       profile.fatherName,
-      fatherOccupation: profile.fatherOccupation,
-      whatsappNumber:   profile.whatsappNumber,
-    };
+    req.user      = user;
+    req.firebaseUid = decoded.uid;
     next();
   } catch (err) {
-    const expired = err.code === 'auth/id-token-expired';
-    res.status(401).json({ error: expired ? 'Session expired. Please login again.' : 'Authentication failed. Please login again.' });
+    if (err.code === 'auth/id-token-expired') {
+      return res.status(401).json({ error: 'Session expired. Please login again.' });
+    }
+    if (err.code === 'auth/argument-error' || err.code === 'auth/invalid-id-token') {
+      return res.status(401).json({ error: 'Invalid session. Please login again.' });
+    }
+    console.error('[AUTH] verifyIdToken error:', err.message);
+    res.status(401).json({ error: 'Authentication failed. Please login again.' });
   }
 };
 
+// Admin auth: simple env var check (no Firebase for admin)
 exports.authenticateAdmin = (req, res, next) => {
   try {
-    const token = req.cookies.adminToken || (req.headers.authorization || '').replace('Bearer ', '').trim();
+    const token = req.cookies.adminToken ||
+                  (req.headers.authorization || '').replace('Bearer ', '').trim();
     if (!token) return res.status(401).json({ error: 'Admin authentication required.' });
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Admin uses a simple signed token stored in cookie
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'aiits-admin-secret');
     if (decoded.role !== 'admin') return res.status(403).json({ error: 'Admin access required.' });
     req.admin = decoded;
     next();
-  } catch {
+  } catch (err) {
     res.status(401).json({ error: 'Admin session expired. Please login again.' });
   }
 };
