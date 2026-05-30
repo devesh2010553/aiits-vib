@@ -2,7 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const Result  = require('../models/Result');
 const Test    = require('../models/Test');
-const User    = require('../models/User');
+const UserProfile = require('../models/UserProfile');
 const { queueResult } = require('../utils/sheetsQueue');
 const { authenticateStudent } = require('../middleware/auth');
 
@@ -55,7 +55,7 @@ router.post('/submit', authenticateStudent, async (req, res) => {
     else { result = new Result(rd); await result.save(); }
     await Promise.all([
       Test.findByIdAndUpdate(testId, { $inc:{ attemptCount:1 } }),
-      User.findByIdAndUpdate(req.user._id, { $inc:{ totalTests:1, totalMarks:obtainedMarks }, $max:{ highestMarks:obtainedMarks } })
+      UserProfile.findByIdAndUpdate(req.user._id, { $inc:{ totalTests:1, totalMarks:obtainedMarks }, $max:{ highestMarks:obtainedMarks } })
     ]);
     queueResult({ submittedAt:new Date(), userName:req.user.name, userEmail:req.user.email, userPhone:req.user.phone||'', batch:req.user.batch, coachingName:req.user.coachingName, testTitle:test.title, subject:test.subject, topic:test.topic, obtainedMarks, totalMarks:test.totalMarks, percentage:pct, correctAnswers, wrongAnswers, notAttempted, timeTaken:tt, rank:overallRank, batchRank, testId, userId:req.user._id });
     const io = req.app.get('io');
