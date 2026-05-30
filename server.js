@@ -90,13 +90,13 @@ app.get('*', async (req,res) => {
   let html = fs.readFileSync(path.join(__dirname,'frontend','index.html'),'utf8');
   // Inject Firebase as regular (non-module) scripts so they run before onload
   const fbCfg = JSON.stringify(firebaseConfig);
+  // Replace placeholder with compat SDK scripts + inline config
+  // Using compat build so firebase.auth() works without ES module import
   const firebaseScripts =
     '<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>' +
     '<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>' +
     '<script>try{var __fbApp=firebase.initializeApp(' + fbCfg + ');window._firebaseAuth=firebase.auth(__fbApp);}catch(e){console.error("Firebase init failed:",e);}</script>';
-  // Inject into <head> so Firebase loads before any body script runs
-  html = html.replace('</head>', firebaseScripts + '</head>');
-  html = html.replace('<script type="module">/* FIREBASE_CONFIG_PLACEHOLDER */</script>', '');
+  html = html.replace('<script type="module">/* FIREBASE_CONFIG_PLACEHOLDER */</script>', firebaseScripts);
   res.setHeader('Content-Type','text/html');
   res.send(html);
 });
