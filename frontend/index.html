@@ -1558,20 +1558,20 @@ function savePassword(){
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+// window.__FIREBASE_CONFIG__ is injected by server.js from env vars
 var cfg = window.__FIREBASE_CONFIG__;
 if (!cfg || !cfg.apiKey) {
-  console.error('Firebase config missing. Add FIREBASE_API_KEY and other FIREBASE_* env vars on Render dashboard.');
+  console.error('[AIITS] Firebase config not found. FIREBASE_API_KEY env var is missing or empty on Render.');
+  // Show visible error so it is obvious during debugging
+  var warn = document.createElement('div');
+  warn.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c00;color:#fff;padding:10px;text-align:center;font-size:13px;z-index:99999';
+  warn.textContent = 'Firebase config missing — check Render environment variables (FIREBASE_API_KEY etc)';
+  document.body.appendChild(warn);
 } else {
-  try {
-    var app  = initializeApp(cfg);
-    var auth = getAuth(app);
-    window._firebaseAuth = auth;
-    // Re-run checkAuth now that Firebase is ready
-    if (typeof checkAuth === 'function') checkAuth();
-  } catch(e) {
-    console.error('Firebase init error:', e);
-  }
+  var fbApp  = initializeApp(cfg);
+  var fbAuth = getAuth(fbApp);
+  window._firebaseAuth = fbAuth;
 }
 </script>
 </body>

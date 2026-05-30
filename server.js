@@ -40,6 +40,18 @@ app.use(express.static(path.join(__dirname,'frontend'), {
 app.get('/ping',   (_,res) => res.status(200).json({ status:'ok', ts:Date.now() }));
 app.get('/health', (_,res) => res.json({ status:'ok', uptime:process.uptime() }));
 app.get('/favicon.ico', (_,res) => res.status(204).end());
+// Debug route — visit /api/debug-firebase to confirm env vars are set
+app.get('/api/debug-firebase', (_,res) => {
+  res.json({
+    FIREBASE_API_KEY:            process.env.FIREBASE_API_KEY             ? 'SET ('+process.env.FIREBASE_API_KEY.slice(0,8)+'...)' : 'MISSING',
+    FIREBASE_AUTH_DOMAIN:        process.env.FIREBASE_AUTH_DOMAIN         ? 'SET' : 'MISSING',
+    FIREBASE_PROJECT_ID:         process.env.FIREBASE_PROJECT_ID          ? 'SET' : 'MISSING',
+    FIREBASE_STORAGE_BUCKET:     process.env.FIREBASE_STORAGE_BUCKET      ? 'SET' : 'MISSING',
+    FIREBASE_MESSAGING_SENDER_ID:process.env.FIREBASE_MESSAGING_SENDER_ID ? 'SET' : 'MISSING',
+    FIREBASE_APP_ID:             process.env.FIREBASE_APP_ID              ? 'SET' : 'MISSING',
+    FIREBASE_SERVICE_ACCOUNT_JSON:process.env.FIREBASE_SERVICE_ACCOUNT_JSON? 'SET' : 'MISSING',
+  });
+});
 app.get('/robots.txt', (_,res) => { res.type('text/plain'); res.send('User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: https://aiits-msc.onrender.com/sitemap.xml'); });
 app.get('/sitemap.xml', (_,res) => {
   const base='https://aiits-msc.onrender.com', d=new Date().toISOString().split('T')[0];
@@ -76,9 +88,9 @@ app.get('*', async (req,res) => {
   };
   const fs = require('fs');
   let html = fs.readFileSync(path.join(__dirname,'frontend','index.html'),'utf8');
-  // Inject config right before </body> — works regardless of what else is in the file
+  // Inject as the very first <script> tag so it runs before anything else reads it
   const configScript = '<script>window.__FIREBASE_CONFIG__=' + JSON.stringify(firebaseConfig) + ';</script>';
-  html = html.replace('</body>', configScript + '</body>');
+  html = html.replace('<script>', configScript + '<script>');
   res.setHeader('Content-Type','text/html');
   res.send(html);
 });

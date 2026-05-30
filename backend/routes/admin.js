@@ -9,10 +9,7 @@ const AdImage     = require('../models/AdImage');
 const admin       = require('../utils/firebaseAdmin');
 const { authenticateAdmin } = require('../middleware/auth');
 
-router.use(authenticateAdmin);
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
-
-// Stats
+// Stats — public, no auth needed (used on home page for counters)
 router.get('/stats', async (req, res) => {
   try {
     const [totalTests, totalStudents, totalAttempts] = await Promise.all([
@@ -30,6 +27,9 @@ router.get('/stats', async (req, res) => {
     res.json({ totalTests, totalStudents, totalAttempts, storageInfo, sheetStats });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
+
+router.use(authenticateAdmin);
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 
 // Tests CRUD
 router.get('/tests', async (req, res) => {
