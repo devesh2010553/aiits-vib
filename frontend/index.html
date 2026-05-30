@@ -9,7 +9,7 @@
 <meta name="robots" content="index,follow">
 <meta property="og:title" content="AIITS - All India Topicwise Test Series by MS Chauhan">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://msc.aiits.workers.dev">
+<meta property="og:url" content="https://aiits-msc.onrender.com">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#b8860b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -787,6 +787,7 @@ textarea{resize:vertical}
 var S={user:null,currentTest:null,answers:{},qIdx:0,startTime:null,timerIv:null,timerTotal:0,timerLeft:0,violations:0,saveIv:null,currentTestId:null};
 var socket=null;
 
+function hideFeedbackDuringTest(isTest){var fab=document.getElementById('feedback-fab-btn');if(fab){if(isTest)fab.classList.add('hidden-fab');else fab.classList.remove('hidden-fab');}}
 function showPage(id){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});var el=document.getElementById(id);if(el){el.classList.add('active');window.scrollTo(0,0);}hideFeedbackDuringTest(id==='page-test');}
 function scrollToSection(id){var el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth'});}
 function esc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -824,7 +825,14 @@ window.addEventListener('load',function(){
   showPage('page-home');
   var ls=document.getElementById('loading-screen');
   if(ls){setTimeout(function(){ls.style.opacity='0';setTimeout(function(){ls.style.display='none';},420);},300);}
-  loadHomeStats();loadHomeGallery();checkAuth();
+  loadHomeStats();loadHomeGallery();
+  // Firebase module scripts are deferred — wait up to 3s for _firebaseAuth to be set
+  var authWaitMs=0;
+  var authWaitInterval=setInterval(function(){
+    authWaitMs+=50;
+    if(window._firebaseAuth){clearInterval(authWaitInterval);checkAuth();return;}
+    if(authWaitMs>=3000){clearInterval(authWaitInterval);checkAuth();}  // timeout fallback
+  },50);
   var resumeId=new URLSearchParams(window.location.search).get('resume');
   if(resumeId)window._pendingResume=resumeId;
   setTimeout(function(){try{if(typeof io!=='undefined')socket=io({withCredentials:true});}catch(e){}},1500);
@@ -1546,27 +1554,24 @@ function savePassword(){
   });
 }
 
-function hideFeedbackDuringTest(isTest){
-  var fab=document.getElementById('feedback-fab-btn');
-  if(fab){if(isTest)fab.classList.add('hidden-fab');else fab.classList.remove('hidden-fab');}
-}
-
 <script>(function(){var s=document.createElement('script');s.src='/socket.io/socket.io.js';s.async=true;document.body.appendChild(s);})();</script>
 
-<script>
-// Firebase config is injected by server from environment variables
-// See server.js — GET / injects window.__FIREBASE_CONFIG__
-</script>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-const firebaseConfig = window.__FIREBASE_CONFIG__;
-if (!firebaseConfig || !firebaseConfig.apiKey) {
-  console.error('Firebase config not found. Check FIREBASE_API_KEY env vars on Render.');
+import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+var cfg = window.__FIREBASE_CONFIG__;
+if (!cfg || !cfg.apiKey) {
+  console.error('Firebase config missing. Add FIREBASE_API_KEY and other FIREBASE_* env vars on Render dashboard.');
 } else {
-  const app  = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  window._firebaseAuth = auth;
+  try {
+    var app  = initializeApp(cfg);
+    var auth = getAuth(app);
+    window._firebaseAuth = auth;
+    // Re-run checkAuth now that Firebase is ready
+    if (typeof checkAuth === 'function') checkAuth();
+  } catch(e) {
+    console.error('Firebase init error:', e);
+  }
 }
 </script>
 </body>
