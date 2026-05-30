@@ -40,9 +40,9 @@ app.use(express.static(path.join(__dirname,'frontend'), {
 app.get('/ping',   (_,res) => res.status(200).json({ status:'ok', ts:Date.now() }));
 app.get('/health', (_,res) => res.json({ status:'ok', uptime:process.uptime() }));
 app.get('/favicon.ico', (_,res) => res.status(204).end());
-app.get('/robots.txt', (_,res) => { res.type('text/plain'); res.send('User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: https://aiits-msc.onrender.com/sitemap.xml'); });
+app.get('/robots.txt', (_,res) => { res.type('text/plain'); res.send('User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: https://msc.aiits.workers.dev/sitemap.xml'); });
 app.get('/sitemap.xml', (_,res) => {
-  const base='https://aiits-msc.onrender.com', d=new Date().toISOString().split('T')[0];
+  const base='https://msc.aiits.workers.dev', d=new Date().toISOString().split('T')[0];
   res.type('application/xml');
   res.send('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>'+base+'/</loc><lastmod>'+d+'</lastmod><priority>1.0</priority></url><url><loc>'+base+'/register</loc><priority>0.8</priority></url><url><loc>'+base+'/login</loc><priority>0.7</priority></url></urlset>');
 });
@@ -66,22 +66,19 @@ app.get('/api/public/ad-images', async (req,res) => {
 
 app.get('*', async (req,res) => {
   if (path.extname(req.path)&&path.extname(req.path)!=='.html') return res.status(404).json({ error:'Not found' });
-  // Inject Firebase public config from env vars so no secrets are hardcoded in index.html
   const firebaseConfig = {
-    apiKey:            process.env.FIREBASE_API_KEY            || '',
-    authDomain:        process.env.FIREBASE_AUTH_DOMAIN        || '',
-    projectId:         process.env.FIREBASE_PROJECT_ID         || '',
-    storageBucket:     process.env.FIREBASE_STORAGE_BUCKET     || '',
-    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID|| '',
-    appId:             process.env.FIREBASE_APP_ID             || '',
+    apiKey:            process.env.FIREBASE_API_KEY             || '',
+    authDomain:        process.env.FIREBASE_AUTH_DOMAIN         || '',
+    projectId:         process.env.FIREBASE_PROJECT_ID          || '',
+    storageBucket:     process.env.FIREBASE_STORAGE_BUCKET      || '',
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '',
+    appId:             process.env.FIREBASE_APP_ID              || '',
   };
   const fs = require('fs');
   let html = fs.readFileSync(path.join(__dirname,'frontend','index.html'),'utf8');
-  const configScript = `<script>window.__FIREBASE_CONFIG__ = ${JSON.stringify(firebaseConfig)};</script>`;
-  html = html.replace('<script>
-// Firebase config is injected by server from environment variables
-// See server.js — GET / injects window.__FIREBASE_CONFIG__
-</script>', configScript);
+  const placeholder = '<script>' + String.fromCharCode(10) + '// Firebase config is injected by server from environment variables' + String.fromCharCode(10) + '// See server.js — GET / injects window.__FIREBASE_CONFIG__' + String.fromCharCode(10) + '</script>';
+  const configScript = '<script>window.__FIREBASE_CONFIG__ = ' + JSON.stringify(firebaseConfig) + ';</script>';
+  html = html.replace(placeholder, configScript);
   res.setHeader('Content-Type','text/html');
   res.send(html);
 });

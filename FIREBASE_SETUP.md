@@ -14,7 +14,7 @@
 ### Customize reset email template
 - Authentication → Templates → Password reset
 - From name: "Vibrant Academy"
-- Customize action URL: `https://aiits-msc.onrender.com/__/auth/action`
+- Customize action URL: `https://msc.aiits.workers.dev/__/auth/action`
 
 ### Get Frontend Config
 - Project settings (gear) → Your apps → Add app → Web
