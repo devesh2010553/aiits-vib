@@ -787,6 +787,15 @@ textarea{resize:vertical}
 var S={user:null,currentTest:null,answers:{},qIdx:0,startTime:null,timerIv:null,timerTotal:0,timerLeft:0,violations:0,saveIv:null,currentTestId:null};
 var socket=null;
 
+function waitForFirebase(cb){
+  if(window._firebaseAuth){cb(window._firebaseAuth);return;}
+  var tries=0;
+  var iv=setInterval(function(){
+    tries++;
+    if(window._firebaseAuth){clearInterval(iv);cb(window._firebaseAuth);return;}
+    if(tries>60){clearInterval(iv);toast('Firebase failed to load. Please refresh the page.','error');}
+  },100);
+}
 function hideFeedbackDuringTest(isTest){var fab=document.getElementById('feedback-fab-btn');if(fab){if(isTest)fab.classList.add('hidden-fab');else fab.classList.remove('hidden-fab');}}
 function showPage(id){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});var el=document.getElementById(id);if(el){el.classList.add('active');window.scrollTo(0,0);}hideFeedbackDuringTest(id==='page-test');}
 function scrollToSection(id){var el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth'});}
@@ -835,13 +844,7 @@ window.addEventListener('load',function(){
 
 function checkAuth(){
   var path=window.location.pathname;
-  var fbAuth=window._firebaseAuth;
-  if(!fbAuth){
-    if(path==='/register')showPage('page-register');
-    else if(path==='/login')showPage('page-login');
-    else showPage('page-home');
-    return;
-  }
+  waitForFirebase(function(fbAuth){
   fbAuth.onAuthStateChanged(function(firebaseUser){
     if(!firebaseUser){
       if(path==='/register')showPage('page-register');
@@ -864,6 +867,7 @@ function checkAuth(){
       else if(path==='/login')showPage('page-login');
       else showPage('page-home');
     });
+  });
   });
 }
 
@@ -922,8 +926,7 @@ function handleRegister(e){
   if(password.length<6){toast('Password must be at least 6 characters','error');return;}
   var btn=document.getElementById('reg-btn');
   btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Creating...';
-  var fbAuth=window._firebaseAuth;
-  if(!fbAuth){toast('Firebase not loaded. Please refresh.','error');btn.disabled=false;btn.innerHTML='<i class="fas fa-user-plus"></i> Create Account';return;}
+  waitForFirebase(function(fbAuth){
   fbAuth.createUserWithEmailAndPassword(email,password).then(function(cred){
     return cred.user.getIdToken().then(function(idToken){
       var payload={idToken:idToken,name:gv('reg-name'),phone:gv('reg-phone'),coachingName:gv('reg-coaching'),fatherName:gv('reg-father'),fatherOccupation:gv('reg-occupation'),whatsappNumber:gv('reg-whatsapp'),batch:batch};
@@ -941,6 +944,7 @@ function handleRegister(e){
     var map={'auth/email-already-in-use':'Email already registered. Try logging in.','auth/weak-password':'Password must be at least 6 characters.','auth/invalid-email':'Invalid email address.'};
     toast(map[err.code]||err.message||'Registration failed','error');
   });
+  });
 }
 
 function handleLogin(){
@@ -948,8 +952,7 @@ function handleLogin(){
   if(!id||!pw){toast('Enter email/phone and password','error');return;}
   var btn=document.getElementById('login-btn');
   btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Logging in...';
-  var fbAuth=window._firebaseAuth;
-  if(!fbAuth){toast('Firebase not loaded. Please refresh.','error');btn.disabled=false;btn.innerHTML='<i class="fas fa-sign-in-alt"></i> Login';return;}
+  waitForFirebase(function(fbAuth){
   var loginPromise;
   if(id.includes('@')){
     loginPromise=fbAuth.signInWithEmailAndPassword(id,pw);
@@ -971,6 +974,7 @@ function handleLogin(){
     var map={'auth/user-not-found':'No account found. Please register.','auth/wrong-password':'Incorrect password.','auth/invalid-credential':'Invalid email or password.','auth/too-many-requests':'Too many attempts. Please wait.','auth/invalid-email':'Invalid email address.'};
     toast(map[err.code]||err.message||'Login failed','error');
   });
+  });
 }
 
 function sendForgotOtp(){
@@ -978,8 +982,7 @@ function sendForgotOtp(){
   if(!email){toast('Enter your email','error');return;}
   var btn=document.getElementById('forgot-btn');
   btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Checking...';
-  var fbAuth=window._firebaseAuth;
-  if(!fbAuth){toast('Firebase not loaded. Please refresh.','error');btn.disabled=false;return;}
+  waitForFirebase(function(fbAuth){
   // Check rate limit + email existence on backend first
   fetch('/api/auth/forgot-attempts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email})})
   .then(function(r){return r.json();})
@@ -1008,6 +1011,7 @@ function sendForgotOtp(){
   }).catch(function(){
     btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> Send Reset Email';
     toast('Network error. Please try again.','error');
+  });
   });
 }
 

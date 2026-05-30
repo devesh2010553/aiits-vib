@@ -93,8 +93,10 @@ app.get('*', async (req,res) => {
   const firebaseScripts =
     '<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>' +
     '<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>' +
-    '<script>try{var __fbApp=firebase.initializeApp(' + fbCfg + ');window._firebaseAuth=firebase.auth(__fbApp);console.log("[AIITS] Firebase ready");}catch(e){console.error("Firebase init failed:",e);}</script>';
-  html = html.replace('<script type="module">/* FIREBASE_CONFIG_PLACEHOLDER */</script>', firebaseScripts);
+    '<script>try{var __fbApp=firebase.initializeApp(' + fbCfg + ');window._firebaseAuth=firebase.auth(__fbApp);}catch(e){console.error("Firebase init failed:",e);}</script>';
+  // Inject into <head> so Firebase loads before any body script runs
+  html = html.replace('</head>', firebaseScripts + '</head>');
+  html = html.replace('<script type="module">/* FIREBASE_CONFIG_PLACEHOLDER */</script>', '');
   res.setHeader('Content-Type','text/html');
   res.send(html);
 });
