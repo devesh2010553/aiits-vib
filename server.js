@@ -92,9 +92,10 @@ app.get('*', async (req,res) => {
   const fbCfg = JSON.stringify(firebaseConfig);
   // Replace placeholder with compat SDK scripts + inline config
   // Using compat build so firebase.auth() works without ES module import
+  // Use locally served Firebase files — no CDN, no network wait, always available
   const firebaseScripts =
-    '<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>' +
-    '<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>' +
+    '<script src="/js/firebase-app-compat.js"></script>' +
+    '<script src="/js/firebase-auth-compat.js"></script>' +
     '<script>try{var __fbApp=firebase.initializeApp(' + fbCfg + ');window._firebaseAuth=firebase.auth(__fbApp);}catch(e){console.error("Firebase init failed:",e);}</script>';
   html = html.replace('<script type="module">/* FIREBASE_CONFIG_PLACEHOLDER */</script>', firebaseScripts);
   res.setHeader('Content-Type','text/html');

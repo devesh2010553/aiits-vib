@@ -827,9 +827,7 @@ window.addEventListener('load',function(){
   var ls=document.getElementById('loading-screen');
   if(ls){setTimeout(function(){ls.style.opacity='0';setTimeout(function(){ls.style.display='none';},420);},300);}
   loadHomeStats();loadHomeGallery();
-  // Small delay to ensure CDN Firebase scripts have initialised
-  if(window._firebaseAuth){checkAuth();}
-  else{setTimeout(function(){checkAuth();},800);}
+  checkAuth();
   var resumeId=new URLSearchParams(window.location.search).get('resume');
   if(resumeId)window._pendingResume=resumeId;
   setTimeout(function(){try{if(typeof io!=='undefined')socket=io({withCredentials:true,transports:['polling']});}catch(e){}},1500);
