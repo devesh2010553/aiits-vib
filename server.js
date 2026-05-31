@@ -68,6 +68,8 @@ app.use('/api/admin',    require('./backend/routes/admin'));
 app.use('/api/tests',    require('./backend/routes/tests'));
 app.use('/api/results',  require('./backend/routes/results'));
 app.use('/api/rankings', require('./backend/routes/rankings'));
+app.use('/api/leaderboard', require('./backend/routes/leaderboard'));
+app.use('/api/chat',        require('./backend/routes/chat'));
 app.use('/api/push',     require('./backend/routes/push'));
 
 app.get('/api/public/ad-images', async (req,res) => {
@@ -103,10 +105,35 @@ app.get('*', async (req,res) => {
   res.send(html);
 });
 
+// In-memory chat state
+let chatMuted = false;
+
 io.on('connection', socket => {
+  // Send current mute state on connect
+  socket.emit('chat-mute-changed', { muted: chatMuted });
   socket.on('join-test',  id => socket.join('test-'+id));
   socket.on('leave-test', id => socket.leave('test-'+id));
   socket.on('join-admin', ()  => socket.join('admin-room'));
+
+  // Public chat
+  socket.on('chat-message', (data) => {
+    if (chatMuted && !data.isAdmin) return;
+    const msg = {
+      id:      Date.now() + Math.random().toString(36).slice(2),
+      name:    (data.name  || 'Student').slice(0, 40),
+      batch:   (data.batch || '').slice(0, 20),
+      text:    (data.text  || '').slice(0, 300),
+      isAdmin: !!data.isAdmin,
+      time:    new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' }),
+    };
+    io.emit('chat-message', msg);
+  });
+
+  socket.on('admin-toggle-mute', (data) => {
+    if (!data.adminKey || data.adminKey !== process.env.ADMIN_PASSWORD) return;
+    chatMuted = !chatMuted;
+    io.emit('chat-mute-changed', { muted: chatMuted });
+  });
 });
 
 const PORT = process.env.PORT||3000;

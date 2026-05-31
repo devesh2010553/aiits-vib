@@ -341,9 +341,16 @@ textarea{resize:vertical}
 
     <!-- ANNOUNCE TAB -->
     <div id="atab-announce" class="atab">
-      <div class="dtab-header"><h3><i class="fas fa-bullhorn" style="color:var(--gold)"></i> Push Notification</h3></div>
-      <div class="email-test-card">
-        <div class="fc-title" style="color:var(--gold);margin-bottom:10px"><i class="fas fa-vial"></i> Email Config Test</div>
+      <div class="dtab-header"><h3><i class="fas fa-bullhorn" style="color:var(--gold)"></i> Push Notification & Chat</h3></div>
+      <div class="form-card" style="max-width:580px;margin-bottom:16px">
+        <div class="fc-title" style="color:var(--gold)"><i class="fas fa-comments"></i> Chat Control</div>
+        <p style="font-size:13px;color:#888;margin-bottom:12px">Students see the Chat tab on their dashboard. Toggle mute to prevent students from sending messages.</p>
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="btn btn-gold" onclick="adminToggleMute()" id="mute-chat-btn"><i class="fas fa-microphone-slash"></i> Toggle Mute Chat</button>
+          <span id="mute-status" style="font-size:13px;color:#888">Status: Loading...</span>
+        </div>
+      </div>
+      </div>
         <p style="font-size:12px;color:#777;margin-bottom:10px">Test your Gmail config before sending to students.</p>
         <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
           <div class="fg" style="flex:1;min-width:180px;margin:0"><label>Send test to</label><input type="email" id="test-email-addr" placeholder="any@email.com"></div>
@@ -391,6 +398,22 @@ textarea{resize:vertical}
     </div>
 
     <!-- ANALYTICS TAB -->
+    <div id="atab-leaderboard" class="atab">
+      <div class="dtab-header"><h3><i class="fas fa-trophy" style="color:var(--gold)"></i> Full Leaderboard</h3></div>
+      <div class="batch-filter" style="margin-bottom:8px">
+        <button class="bfbtn active" onclick="setAdminLbMode('overall')" id="albm-overall">Overall %</button>
+        <button class="bfbtn" onclick="setAdminLbMode('normalised')" id="albm-normalised">All Batches (Normalised)</button>
+      </div>
+      <div class="batch-filter" id="admin-lb-batch-filter">
+        <button class="bfbtn active" onclick="loadAdminLb('')" id="albf-all">All</button>
+        <button class="bfbtn" onclick="loadAdminLb('11')" id="albf-11">Class 11</button>
+        <button class="bfbtn" onclick="loadAdminLb('12')" id="albf-12">Class 12</button>
+        <button class="bfbtn" onclick="loadAdminLb('dropper')" id="albf-dropper">Dropper</button>
+      </div>
+      <p style="font-size:12px;color:#888;margin-bottom:8px">Ranked by percentage: (obtained ÷ total) × 100. Tiebreak: time taken.</p>
+      <div id="admin-lb-table" style="overflow-x:auto"></div>
+    </div>
+
     <div id="atab-analytics" class="atab">
       <div class="dtab-header"><h3><i class="fas fa-chart-pie" style="color:var(--gold)"></i> Analytics &amp; Storage</h3></div>
       <div class="analytics-cards">
@@ -887,13 +910,96 @@ function loadCheatLogs(){
     if(!logs.length){c.innerHTML='<p style="text-align:center;color:#888;padding:28px">No cheating reports yet.</p>';return;}
     var html='';
     logs.forEach(function(l){
-      html+='<div class="cheat-item"><h4><i class="fas fa-exclamation-triangle"></i> '+esc(l.userName)+' - '+l.violations+' violation(s) '+(l.autoSubmitted?'<span style="background:#fee2e2;color:#c53030;padding:1px 6px;border-radius:4px;font-size:10px">AUTO-SUBMITTED</span>':'')+'</h4>';
+      html+='<div class="cheat-item"><div style="display:flex;justify-content:space-between;align-items:flex-start"><h4><i class="fas fa-exclamation-triangle"></i> '+esc(l.userName)+' - '+l.violations+' violation(s) '+(l.autoSubmitted?'<span style="background:#fee2e2;color:#c53030;padding:1px 6px;border-radius:4px;font-size:10px">AUTO-SUBMITTED</span>':'')+'</h4><button class="btn btn-red btn-sm" style="flex-shrink:0;margin-left:8px" onclick="deleteCheatLog(\'' + l._id + '\')" ><i class="fas fa-times"></i></button></div>';
       html+='<p><i class="fas fa-envelope" style="margin-right:4px"></i>'+esc(l.userEmail)+'</p>';
       html+='<p><i class="fas fa-file-alt" style="margin-right:4px"></i>'+esc(l.testTitle||'-')+'</p>';
       html+='<p><i class="fas fa-info-circle" style="margin-right:4px"></i>'+esc(l.details||'-')+' - '+new Date(l.createdAt).toLocaleString('en-IN')+'</p></div>';
     });
     c.innerHTML=html;
   }).catch(function(err){c.innerHTML='<p style="color:#c53030">'+esc(err.message)+'</p>';});
+}
+
+// DELETE STUDENT
+function deleteStudent(id, name){
+  if(!confirm('Delete student "'+name+'" and all their results? Cannot be undone.'))return;
+  api('/api/admin/students/'+id,{method:'DELETE'}).then(function(){
+    toast('Student deleted','success');loadStudents();
+  }).catch(function(e){toast(e.message,'error');});
+}
+
+// DELETE BATCH
+function deleteBatch(batch){
+  var label={'11':'Class 11','12':'Class 12','dropper':'Dropper'}[batch];
+  if(!confirm('DELETE ALL '+label+' STUDENTS AND THEIR RESULTS?
+
+This CANNOT be undone.'))return;
+  if(!confirm('Are you 100% sure? This removes ALL '+label+' data permanently.'))return;
+  api('/api/admin/students/batch/'+batch,{method:'DELETE'}).then(function(r){
+    toast('Deleted '+r.deletedStudents+' students and '+r.deletedResults+' results','success');
+    loadStudents();
+  }).catch(function(e){toast(e.message,'error');});
+}
+
+// DELETE CHEAT LOG
+function deleteCheatLog(id){
+  api('/api/push/cheat-logs?id='+id,{method:'DELETE'}).then(function(){
+    toast('Log deleted','success');loadCheatLogs();
+  }).catch(function(e){toast(e.message,'error');});
+}
+
+// CLEAR ALL CHEAT LOGS
+function clearAllCheatLogs(){
+  if(!confirm('Clear ALL cheating logs? Cannot be undone.'))return;
+  api('/api/push/cheat-logs',{method:'DELETE'}).then(function(r){
+    toast('Cleared '+r.deleted+' logs','success');loadCheatLogs();
+  }).catch(function(e){toast(e.message,'error');});
+}
+
+// ADMIN CHAT MUTE TOGGLE
+function adminToggleMute(){
+  api('/api/chat/mute',{method:'POST'}).then(function(r){
+    var btn=document.getElementById('mute-chat-btn');
+    var stat=document.getElementById('mute-status');
+    if(stat)stat.textContent='Status: '+(r.muted?'🔇 Muted — students cannot send messages':'🔊 Open — students can chat');
+    if(btn)btn.innerHTML=r.muted?'<i class="fas fa-microphone"></i> Unmute Chat':'<i class="fas fa-microphone-slash"></i> Mute Chat';
+    toast(r.muted?'Chat muted':'Chat unmuted','success');
+  }).catch(function(e){toast(e.message,'error');});
+}
+
+// ADMIN LEADERBOARD
+var adminLbMode='overall', adminLbBatch='';
+function setAdminLbMode(mode){
+  adminLbMode=mode;adminLbBatch='';
+  ['overall','normalised'].forEach(function(m){var el=document.getElementById('albm-'+m);if(el)el.classList.toggle('active',m===mode);});
+  var bf=document.getElementById('admin-lb-batch-filter');if(bf)bf.style.display=mode==='normalised'?'none':'flex';
+  ['all','11','12','dropper'].forEach(function(b){var el=document.getElementById('albf-'+b);if(el)el.classList.toggle('active',b===''||b===adminLbBatch);});
+  loadAdminLb('');
+}
+function loadAdminLb(batch){
+  if(batch!==undefined)adminLbBatch=batch;
+  ['all','11','12','dropper'].forEach(function(b){var el=document.getElementById('albf-'+b);if(el)el.classList.toggle('active',(b===''&&adminLbBatch==='')||(b===adminLbBatch));});
+  var c=document.getElementById('admin-lb-table');if(!c)return;
+  c.innerHTML='<p style="color:#888;padding:12px">Loading...</p>';
+  var url=adminLbMode==='normalised'?'/api/leaderboard/normalised':'/api/leaderboard/overall?batch='+adminLbBatch;
+  api(url).then(function(data){
+    if(!data.length){c.innerHTML='<p style="color:#888;padding:12px">No data yet.</p>';return;}
+    var medal=['🥇','🥈','🥉'];
+    c.innerHTML='<table class="data-table"><thead><tr><th>Rank</th><th>Name</th><th>Batch</th><th>Coaching</th><th>Tests</th><th>Score %</th><th>Marks</th><th>Time</th></tr></thead><tbody>'+
+      data.map(function(u,i){
+        var mins=Math.floor((u.totalTime||0)/60),secs=((u.totalTime||0)%60).toString().padStart(2,'0');
+        return '<tr><td>'+(medal[i]||i+1)+'</td><td>'+esc(u.name)+'</td><td>'+esc(u.batch||'--')+'</td><td>'+esc(u.coachingName||'--')+'</td><td>'+u.testCount+'</td><td><strong>'+u.percentage+'%</strong></td><td>'+u.totalObtained+'/'+u.totalPossible+'</td><td>'+mins+'m '+secs+'s</td></tr>';
+      }).join('')+'</tbody></table>';
+  }).catch(function(e){c.innerHTML='<p style="color:#c53030">'+esc(e.message)+'</p>';});
+}
+
+// Load chat mute status on page load
+function loadChatStatus(){
+  fetch('/api/chat/status').then(function(r){return r.json();}).then(function(d){
+    var stat=document.getElementById('mute-status');
+    var btn=document.getElementById('mute-chat-btn');
+    if(stat)stat.textContent='Status: '+(d.muted?'🔇 Muted':'🔊 Open');
+    if(btn)btn.innerHTML=d.muted?'<i class="fas fa-microphone"></i> Unmute Chat':'<i class="fas fa-microphone-slash"></i> Mute Chat';
+  }).catch(function(){});
 }
 
 // ANALYTICS

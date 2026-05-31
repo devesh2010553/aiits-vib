@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="google-adsense-account" content="ca-pub-3517811725655802">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <meta name="google-site-verification" content="v566CVbDNVYH-ulVTAnUDlp2qta_Gl0oF3LIm4TtuKU">
 <title>AIITS - All India Topicwise Test Series | MS Chauhan | Vibrant Academy</title>
 <meta name="description" content="All India Topicwise Test Series by MS Chauhan, HOD Vibrant Academy. Topic-wise JEE tests with real-time all-India rankings.">
@@ -516,6 +517,7 @@ textarea{resize:vertical}
       <button class="nav-link" onclick="switchTab('my-results')"><i class="fas fa-chart-bar"></i> My Results</button>
       <button class="nav-link" onclick="switchTab('leaderboard')"><i class="fas fa-trophy"></i> Leaderboard</button>
       <button class="nav-link" onclick="switchTab('gallery')"><i class="fas fa-images"></i> Gallery</button>
+      <button class="nav-link" onclick="switchTab('chat')"><i class="fas fa-comments"></i> Chat</button>
       <button class="nav-link" onclick="switchTab('settings')"><i class="fas fa-cog"></i> Account</button>
     </div>
     <div class="nav-right">
@@ -527,8 +529,8 @@ textarea{resize:vertical}
     <button class="mob-btn active" onclick="switchTab('tests')"><i class="fas fa-list-alt"></i><span>Tests</span></button>
     <button class="mob-btn" onclick="switchTab('my-results')"><i class="fas fa-chart-bar"></i><span>Results</span></button>
     <button class="mob-btn" onclick="switchTab('leaderboard')"><i class="fas fa-trophy"></i><span>Board</span></button>
-    <button class="mob-btn" onclick="switchTab('gallery')"><i class="fas fa-images"></i><span>Gallery</span></button>
-    <button class="mob-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i><span>Logout</span></button>
+    <button class="mob-btn" onclick="switchTab('chat')"><i class="fas fa-comments"></i><span>Chat</span></button>
+    <button class="mob-btn" onclick="switchTab('settings')"><i class="fas fa-cog"></i><span>Account</span></button>
   </div>
   <div class="dash-container">
     <div class="welcome-bar">
@@ -548,16 +550,36 @@ textarea{resize:vertical}
     <!-- LEADERBOARD TAB -->
     <div id="dash-tab-leaderboard" class="dtab">
       <div class="dtab-header"><h3><i class="fas fa-trophy" style="color:var(--gold)"></i> Leaderboard</h3></div>
-      <div class="batch-filter-row">
-        <button class="bfbtn active" onclick="loadLeaderboard('')" id="lbf-all">All</button>
-        <button class="bfbtn" onclick="loadLeaderboard('11')" id="lbf-11">Class 11</button>
-        <button class="bfbtn" onclick="loadLeaderboard('12')" id="lbf-12">Class 12</button>
-        <button class="bfbtn" onclick="loadLeaderboard('dropper')" id="lbf-dropper">Dropper</button>
+      <div class="batch-filter" style="margin-bottom:8px">
+        <button class="bfbtn active" onclick="setLbMode('overall')" id="lbm-overall"><i class="fas fa-percent"></i> Overall %</button>
+        <button class="bfbtn" onclick="setLbMode('normalised')" id="lbm-normalised"><i class="fas fa-globe"></i> All Batches</button>
       </div>
-      <p class="info-note"><i class="fas fa-info-circle"></i> Total marks across all AIITS tests</p>
+      <div class="batch-filter" id="lb-batch-filter">
+        <button class="bfbtn active" onclick="loadNewLeaderboard('')" id="lbf-all2">All</button>
+        <button class="bfbtn" onclick="loadNewLeaderboard('11')" id="lbf-112">Class 11</button>
+        <button class="bfbtn" onclick="loadNewLeaderboard('12')" id="lbf-122">Class 12</button>
+        <button class="bfbtn" onclick="loadNewLeaderboard('dropper')" id="lbf-dropper2">Dropper</button>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px"><i class="fas fa-info-circle"></i> Ranked by: (marks obtained ÷ total marks) × 100. Ties broken by time taken.</p>
       <div id="leaderboard-table"></div>
     </div>
     <!-- GALLERY TAB -->
+    <!-- CHAT TAB -->
+    <div id="dash-tab-chat" class="dtab">
+      <div class="dtab-header">
+        <h3><i class="fas fa-comments" style="color:var(--gold)"></i> Class Chat</h3>
+        <div id="chat-mute-badge" class="hidden" style="background:#fee2e2;color:#c53030;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600"><i class="fas fa-microphone-slash"></i> Chat Muted by Admin</div>
+      </div>
+      <div id="chat-box" style="height:340px;overflow-y:auto;border:1.5px solid var(--border);border-radius:var(--radius);padding:12px;background:#fafaf8;margin-bottom:10px;display:flex;flex-direction:column;gap:6px">
+        <p style="text-align:center;color:var(--text-muted);font-size:13px;margin:auto">Loading chat...</p>
+      </div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="chat-input" placeholder="Type a message..." maxlength="300" style="flex:1" onkeydown="if(event.key==='Enter')sendChatMsg()">
+        <button class="btn btn-gold" onclick="sendChatMsg()" id="chat-send-btn"><i class="fas fa-paper-plane"></i></button>
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:6px">Messages are not stored — they disappear when the page refreshes.</p>
+    </div>
+
     <div id="dash-tab-gallery" class="dtab">
       <div class="dtab-header"><h3><i class="fas fa-images" style="color:var(--gold)"></i> Gallery -- Vibrant Academy</h3></div>
       <div id="student-gallery" class="gallery-grid"></div>
@@ -627,6 +649,16 @@ textarea{resize:vertical}
               <button class="btn btn-ghost" onclick="toggleChangePassword()">Cancel</button>
             </div>
           </div>
+        </div>
+
+        <!-- Push Notifications -->
+        <div class="settings-card">
+          <div class="settings-card-hdr">
+            <h4><i class="fas fa-bell" style="color:var(--gold)"></i> Push Notifications</h4>
+          </div>
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Get notified when new tests are published or announcements are made.</p>
+          <button class="btn btn-gold" onclick="requestNotificationPermission()" id="notif-btn"><i class="fas fa-bell"></i> Enable Notifications</button>
+          <p id="notif-status" style="font-size:12px;color:var(--text-muted);margin-top:8px"></p>
         </div>
 
         <!-- Danger Zone -->
@@ -830,7 +862,7 @@ window.addEventListener('load',function(){
   checkAuth();
   var resumeId=new URLSearchParams(window.location.search).get('resume');
   if(resumeId)window._pendingResume=resumeId;
-  setTimeout(function(){try{if(typeof io!=='undefined')socket=io({withCredentials:true,transports:['polling']});}catch(e){}},1500);
+  setTimeout(function(){try{if(typeof io!=='undefined'){socket=io({withCredentials:true,transports:['polling']});window.socket=socket;}}catch(e){}},1500);
   if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(function(){});
 });
 
@@ -959,7 +991,7 @@ function handleLogin(){
   }).then(function(r){
     btn.disabled=false;btn.innerHTML='<i class="fas fa-sign-in-alt"></i> Login';
     S.user=r.user;updateNavUser();toast('Welcome back, '+r.user.name+'!','success');
-    showPage('page-dashboard');loadDashboard();
+    showPage('page-dashboard');loadDashboard();updateNotifButton();
     if('serviceWorker' in navigator)navigator.serviceWorker.ready.then(function(reg){setupPush(reg);}).catch(function(){});
     if(window._pendingResume){var rid=window._pendingResume;window._pendingResume=null;setTimeout(function(){initiateTest(rid);},900);}
   }).catch(function(err){
@@ -1017,6 +1049,7 @@ function updateNavUser(){
   var pi=document.getElementById('profile-info');
   if(pi)pi.innerHTML='<strong>Name:</strong> '+esc(S.user.name)+'<br><strong>Email:</strong> '+esc(S.user.email)+'<br><strong>Phone:</strong> '+esc(S.user.phone||'--')+'<br><strong>WhatsApp:</strong> '+esc(S.user.whatsappNumber||'--')+'<br><strong>Batch:</strong> '+(bMap&&bMap[S.user.batch]||S.user.batch)+'<br><strong>Coaching:</strong> '+esc(S.user.coachingName||'--')+'<br><strong>Father:</strong> '+esc(S.user.fatherName||'--');
   var em=document.getElementById('current-email-display');if(em)em.textContent=S.user.email||'';
+  updateNotifButton();
 }
 
 function logout(){
@@ -1049,7 +1082,8 @@ function switchTab(tab){
   document.querySelectorAll('#page-dashboard .mob-btn').forEach(function(l){l.classList.toggle('active',(l.getAttribute('onclick')||'').indexOf("'"+tab+"'")!==-1);});
   if(tab==='tests')loadTests();
   else if(tab==='my-results')loadMyResults();
-  else if(tab==='leaderboard')loadLeaderboard('');
+  else if(tab==='leaderboard'){setLbMode('overall');}
+  else if(tab==='chat'){if(window.socket)initChat();}
   else if(tab==='gallery')loadStudentGallery();
   else if(tab==='settings')updateNavUser();
 }
@@ -1537,6 +1571,120 @@ function savePassword(){
   });
 }
 </script>
+
+
+// ── Leaderboard ──────────────────────────────────────────────────────────────
+var lbMode='overall', lbBatch='';
+function setLbMode(mode){
+  lbMode=mode;
+  ['overall','normalised'].forEach(function(m){var el=document.getElementById('lbm-'+m);if(el)el.classList.toggle('active',m===mode);});
+  var bf=document.getElementById('lb-batch-filter');
+  if(bf)bf.style.display=mode==='normalised'?'none':'flex';
+  lbBatch='';
+  ['all2','112','122','dropper2'].forEach(function(id){var el=document.getElementById('lbf-'+id);if(el)el.classList.toggle('active',id==='all2');});
+  loadNewLeaderboard();
+}
+function loadNewLeaderboard(batch){
+  if(batch!==undefined)lbBatch=batch;
+  ['all2','112','122','dropper2'].forEach(function(id){
+    var b=id==='all2'?'':id==='dropper2'?'dropper':id.replace('2','');
+    var el=document.getElementById('lbf-'+id);if(el)el.classList.toggle('active',b===lbBatch);
+  });
+  var c=document.getElementById('leaderboard-table');if(!c)return;
+  c.innerHTML='<div class="skel" style="height:40px;margin-bottom:4px"></div><div class="skel" style="height:40px;margin-bottom:4px"></div><div class="skel" style="height:40px"></div>';
+  var url=lbMode==='normalised'?'/api/leaderboard/normalised':'/api/leaderboard/overall?batch='+lbBatch;
+  api(url).then(function(data){
+    if(!data.length){c.innerHTML='<p style="text-align:center;color:var(--text-muted);padding:28px">No data yet.</p>';return;}
+    var medal=['🥇','🥈','🥉'];
+    c.innerHTML='<div style="overflow-x:auto"><table class="rank-table"><thead><tr>'+(lbMode==='normalised'?'<th>Rank</th><th>Name</th><th>Batch</th><th>Tests</th><th>Score%</th><th>Time</th>':'<th>Rank</th><th>Name</th><th>Batch</th><th>Tests</th><th>Score%</th><th>Total Marks</th><th>Time</th>')+'</tr></thead><tbody>'+
+      data.map(function(u,i){
+        var cls=i<3?'rank-'+(i+1):'';
+        var pct='<span style="font-weight:700;color:'+(u.percentage>=80?'#276749':u.percentage>=50?'#d97706':'#c53030')+'">'+u.percentage+'%</span>';
+        var mins=Math.floor((u.totalTime||0)/60),secs=((u.totalTime||0)%60).toString().padStart(2,'0');
+        var timeStr=mins+'m '+secs+'s';
+        var name=(medal[i]||'')+' '+esc(u.name);
+        return '<tr class="'+cls+'"><td>'+(i+1)+'</td><td>'+name+'</td><td>'+esc(u.batch||'--')+'</td><td>'+u.testCount+'</td><td>'+pct+'</td>'+(lbMode==='overall'?'<td>'+u.totalObtained+'/'+u.totalPossible+'</td>':'')+'<td>'+timeStr+'</td></tr>';
+      }).join('')+'</tbody></table></div>';
+  }).catch(function(e){c.innerHTML='<p style="color:var(--red)">'+esc(e.message)+'</p>';});
+}
+
+// ── Chat ─────────────────────────────────────────────────────────────────────
+var chatMutedLocal=false;
+function initChat(){
+  if(!window.socket)return;
+  window.socket.on('chat-message',function(msg){appendChatMsg(msg);});
+  window.socket.on('chat-mute-changed',function(d){
+    chatMutedLocal=d.muted;
+    var badge=document.getElementById('chat-mute-badge');
+    var inp=document.getElementById('chat-input');
+    var btn=document.getElementById('chat-send-btn');
+    if(badge)badge.classList.toggle('hidden',!d.muted);
+    if(inp)inp.disabled=d.muted;
+    if(btn)btn.disabled=d.muted;
+    if(d.muted){inp&&(inp.placeholder='Chat muted by admin');}
+    else{inp&&(inp.placeholder='Type a message...');}
+  });
+  // Clear placeholder
+  var box=document.getElementById('chat-box');
+  if(box)box.innerHTML='<p style="text-align:center;color:var(--text-muted);font-size:12px">Messages are live — they disappear on refresh.</p>';
+}
+function appendChatMsg(msg){
+  var box=document.getElementById('chat-box');if(!box)return;
+  var div=document.createElement('div');
+  div.style.cssText='padding:6px 10px;border-radius:8px;max-width:85%;word-break:break-word;font-size:13px;'+(msg.isAdmin?'background:#fef3c7;border:1px solid #f0c040;align-self:flex-start':'background:#fff;border:1px solid var(--border);align-self:flex-start');
+  div.innerHTML='<span style="font-weight:700;color:var(--gold);font-size:11px">'+(msg.isAdmin?'👑 Admin':esc(msg.name)+' <span style="opacity:0.6;font-weight:400">('+esc(msg.batch)+')</span>')+'</span> <span style="opacity:0.5;font-size:10px">'+msg.time+'</span><br>'+esc(msg.text);
+  box.appendChild(div);
+  box.scrollTop=box.scrollHeight;
+}
+function sendChatMsg(){
+  if(chatMutedLocal){toast('Chat is muted by admin','error');return;}
+  var inp=document.getElementById('chat-input');
+  var text=(inp?inp.value:'').trim();
+  if(!text)return;
+  if(!window.socket){toast('Not connected','error');return;}
+  window.socket.emit('chat-message',{name:S.user?S.user.name:'Student',batch:S.user?S.user.batch:'',text:text,isAdmin:false});
+  if(inp)inp.value='';
+}
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+function requestNotificationPermission(){
+  var btn=document.getElementById('notif-btn');
+  var status=document.getElementById('notif-status');
+  if(!('Notification' in window)){if(status)status.textContent='Notifications not supported on this browser.';return;}
+  if(Notification.permission==='granted'){
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.ready.then(function(reg){setupPush(reg);});
+    }
+    if(status)status.textContent='✓ Notifications are already enabled!';
+    if(btn)btn.innerHTML='<i class="fas fa-check"></i> Enabled';
+    return;
+  }
+  Notification.requestPermission().then(function(permission){
+    if(permission==='granted'){
+      if('serviceWorker' in navigator){
+        navigator.serviceWorker.ready.then(function(reg){setupPush(reg);});
+      }
+      if(status)status.textContent='✓ Notifications enabled!';
+      if(btn)btn.innerHTML='<i class="fas fa-check"></i> Enabled';
+    } else {
+      if(status)status.textContent='Notifications blocked. Please allow in browser settings.';
+    }
+  });
+}
+function updateNotifButton(){
+  var btn=document.getElementById('notif-btn');
+  var status=document.getElementById('notif-status');
+  if(!btn)return;
+  if(!('Notification' in window)){btn.style.display='none';return;}
+  if(Notification.permission==='granted'){
+    btn.innerHTML='<i class="fas fa-check"></i> Notifications Enabled';
+    btn.disabled=true;
+    if(status)status.textContent='You will receive push notifications.';
+  } else if(Notification.permission==='denied'){
+    if(status)status.textContent='Notifications blocked. Enable in browser/OS settings.';
+    btn.innerHTML='<i class="fas fa-bell-slash"></i> Blocked — Allow in Settings';
+  }
+}
 
 <script>(function(){var s=document.createElement('script');s.src='/socket.io/socket.io.js';s.async=true;document.body.appendChild(s);})();</script>
 

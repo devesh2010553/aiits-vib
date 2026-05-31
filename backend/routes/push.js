@@ -51,4 +51,18 @@ router.get('/cheat-logs', authenticateAdmin, async (req,res) => {
   catch(err) { res.status(500).json({ error:err.message }); }
 });
 
+
+
+router.delete('/cheat-logs', authenticateAdmin, async (req,res) => {
+  try {
+    const { id } = req.query;
+    if (id) {
+      await CheatingLog.findByIdAndDelete(id);
+      res.json({ message: 'Log deleted' });
+    } else {
+      const r = await CheatingLog.deleteMany({});
+      res.json({ message: 'All cheat logs cleared', deleted: r.deletedCount });
+    }
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
 module.exports = router;
