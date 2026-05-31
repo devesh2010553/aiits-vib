@@ -820,6 +820,21 @@ textarea{resize:vertical}
 var S={user:null,currentTest:null,answers:{},qIdx:0,startTime:null,timerIv:null,timerTotal:0,timerLeft:0,violations:0,saveIv:null,currentTestId:null};
 var socket=null;
 
+function updateNotifButton(){
+  var btn=document.getElementById('notif-btn');
+  var status=document.getElementById('notif-status');
+  if(!btn)return;
+  if(!('Notification' in window)){btn.style.display='none';return;}
+  if(Notification.permission==='granted'){
+    btn.innerHTML='<i class="fas fa-check"></i> Notifications Enabled';
+    btn.disabled=true;
+    if(status)status.textContent='You will receive push notifications.';
+  } else if(Notification.permission==='denied'){
+    if(status)status.textContent='Notifications blocked. Enable in browser/OS settings.';
+    btn.innerHTML='<i class="fas fa-bell-slash"></i> Blocked — Allow in Settings';
+  }
+}
+
 function hideFeedbackDuringTest(isTest){var fab=document.getElementById('feedback-fab-btn');if(fab){if(isTest)fab.classList.add('hidden-fab');else fab.classList.remove('hidden-fab');}}
 function showPage(id){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});var el=document.getElementById(id);if(el){el.classList.add('active');window.scrollTo(0,0);}hideFeedbackDuringTest(id==='page-test');}
 function scrollToSection(id){var el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth'});}
@@ -991,7 +1006,7 @@ function handleLogin(){
   }).then(function(r){
     btn.disabled=false;btn.innerHTML='<i class="fas fa-sign-in-alt"></i> Login';
     S.user=r.user;updateNavUser();toast('Welcome back, '+r.user.name+'!','success');
-    showPage('page-dashboard');loadDashboard();updateNotifButton();
+    showPage('page-dashboard');loadDashboard();
     if('serviceWorker' in navigator)navigator.serviceWorker.ready.then(function(reg){setupPush(reg);}).catch(function(){});
     if(window._pendingResume){var rid=window._pendingResume;window._pendingResume=null;setTimeout(function(){initiateTest(rid);},900);}
   }).catch(function(err){
@@ -1671,20 +1686,7 @@ function requestNotificationPermission(){
     }
   });
 }
-function updateNotifButton(){
-  var btn=document.getElementById('notif-btn');
-  var status=document.getElementById('notif-status');
-  if(!btn)return;
-  if(!('Notification' in window)){btn.style.display='none';return;}
-  if(Notification.permission==='granted'){
-    btn.innerHTML='<i class="fas fa-check"></i> Notifications Enabled';
-    btn.disabled=true;
-    if(status)status.textContent='You will receive push notifications.';
-  } else if(Notification.permission==='denied'){
-    if(status)status.textContent='Notifications blocked. Enable in browser/OS settings.';
-    btn.innerHTML='<i class="fas fa-bell-slash"></i> Blocked — Allow in Settings';
-  }
-}
+
 
 <script>(function(){var s=document.createElement('script');s.src='/socket.io/socket.io.js';s.async=true;document.body.appendChild(s);})();</script>
 
