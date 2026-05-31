@@ -31,6 +31,7 @@ app.use('/api/', rateLimit({ windowMs:15*60*1000, max:600 }));
 app.use('/api/auth/register',        rateLimit({ windowMs:60*60*1000, max:10 }));
 
 app.use(express.static(path.join(__dirname,'frontend'), {
+  index: false,   // Do NOT serve index.html automatically — catch-all handles it with Firebase injection
   setHeaders:(res,fp) => {
     if (fp.endsWith('sw.js'))  { res.setHeader('Cache-Control','no-cache'); res.setHeader('Service-Worker-Allowed','/'); }
     if (fp.endsWith('.html'))    res.setHeader('Cache-Control','no-cache,no-store,must-revalidate');
