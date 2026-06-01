@@ -1130,15 +1130,18 @@ function loadTests(){
 // AD: show images inline without redirect - just display as overlay
 function initiateTest(testId){
   S.currentTestId=testId;
-  api('/api/tests/'+testId).then(function(test){
+  // Fetch test + ad in parallel for speed
+  Promise.all([
+    api('/api/tests/'+testId),
+    api('/api/tests/'+testId+'/ad').catch(function(){return null;})
+  ]).then(function(results){
+    var test=results[0], ad=results[1];
     S.currentTest=test;
-    api('/api/tests/'+testId+'/ad').then(function(ad){
-      if(ad&&ad.adEnabled&&ad.images&&ad.images.length>0){
-        showAdOverlay(ad.images,function(){showFsPrompt(test);});
-      } else {
-        showFsPrompt(test);
-      }
-    }).catch(function(){showFsPrompt(test);});
+    if(ad&&ad.adEnabled&&ad.images&&ad.images.length>0){
+      showAdOverlay(ad.images,function(){showFsPrompt(test);});
+    } else {
+      showFsPrompt(test);
+    }
   }).catch(function(err){toast(err.message,'error');});
 }
 
@@ -1645,13 +1648,9 @@ function loadChatFromStorage(){
 }
 var chatMessages=loadChatFromStorage();
 
-function showChatUnreadDot(show) {
-    var btn = document.querySelector(".mob-btn[onclick*='chat'], button[onclick*='chat']");
-    var dots = document.querySelectorAll('.chat-unread-dot');
-
-    dots.forEach(function(d) {
-        d.style.display = show ? 'block' : 'none';
-    });
+function showChatUnreadDot(show){
+  var dots=document.querySelectorAll('.chat-unread-dot');
+  dots.forEach(function(d){d.style.display=show?'block':'none';});
 }
 
 function initChat(){

@@ -117,22 +117,42 @@ io.on('connection', socket => {
 
   // Public chat
   socket.on('chat-message', (data) => {
-    if (chatMuted && !data.isAdmin) return;
+    // Verify isAdmin claim by checking if socket has admin cookie
+    let isAdmin = false;
+    if (data.isAdmin) {
+      try {
+        const cookies = socket.handshake.headers.cookie || '';
+        const match = cookies.match(/adminToken=([^;]+)/);
+        if (match) {
+          const jwt = require('jsonwebtoken');
+          const decoded = jwt.verify(match[1], process.env.JWT_SECRET);
+          isAdmin = decoded.role === 'admin';
+        }
+      } catch(e) { isAdmin = false; }
+    }
+    if (chatMuted && !isAdmin) return;
     const msg = {
       id:      Date.now() + Math.random().toString(36).slice(2),
-      name:    (data.name  || 'Student').slice(0, 40),
-      batch:   (data.batch || '').slice(0, 20),
-      text:    (data.text  || '').slice(0, 300),
-      isAdmin: !!data.isAdmin,
+      name:    isAdmin ? 'Admin' : (data.name || 'Student').slice(0, 40),
+      batch:   isAdmin ? '' : (data.batch || '').slice(0, 20),
+      text:    (data.text || '').slice(0, 300),
+      isAdmin: isAdmin,
       time:    new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' }),
     };
     io.emit('chat-message', msg);
   });
 
   socket.on('admin-toggle-mute', (data) => {
-    if (!data.adminKey || data.adminKey !== process.env.ADMIN_PASSWORD) return;
-    chatMuted = !chatMuted;
-    io.emit('chat-mute-changed', { muted: chatMuted });
+    try {
+      const cookies = socket.handshake.headers.cookie || '';
+      const match = cookies.match(/adminToken=([^;]+)/);
+      if (!match) return;
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.verify(match[1], process.env.JWT_SECRET);
+      if (decoded.role !== 'admin') return;
+      chatMuted = !chatMuted;
+      io.emit('chat-mute-changed', { muted: chatMuted });
+    } catch(e) {}
   });
 });
 

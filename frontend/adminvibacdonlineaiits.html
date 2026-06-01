@@ -351,21 +351,18 @@ textarea{resize:vertical}
         </div>
       </div>
       </div>
-        <p style="font-size:12px;color:#777;margin-bottom:10px">Test your Gmail config before sending to students.</p>
-        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
-          <div class="fg" style="flex:1;min-width:180px;margin:0"><label>Send test to</label><input type="email" id="test-email-addr" placeholder="any@email.com"></div>
-          <button class="btn btn-gold btn-sm" style="flex-shrink:0" onclick="testEmailConfig()"><i class="fas fa-paper-plane"></i> Send Test</button>
+      <!-- Admin Chat Panel -->
+      <div class="form-card" style="max-width:580px;margin-bottom:16px">
+        <div class="fc-title" style="color:var(--gold)"><i class="fas fa-comments"></i> Admin Chat (visible to all students)</div>
+        <div id="admin-chat-box" style="height:260px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;padding:10px;background:#fafaf8;margin-bottom:10px;display:flex;flex-direction:column;gap:6px">
+          <p style="text-align:center;color:#888;font-size:12px;margin:auto">Chat messages appear here in real-time.</p>
         </div>
-        <div id="email-test-result" style="margin-top:10px;font-size:12px;display:none;padding:8px 12px;border-radius:6px;background:#fff"></div>
-        <div class="setup-steps">
-          <strong style="color:var(--gold)">Gmail App Password Setup (required):</strong><br>
-          1. Go to <strong>myaccount.google.com</strong> &rarr; Security &rarr; Turn ON <strong>2-Step Verification</strong><br>
-          2. Go to <strong>myaccount.google.com/apppasswords</strong><br>
-          3. Click "Select app" &rarr; Choose <em>Mail</em> &rarr; "Select device" &rarr; <em>Other (AIITS)</em> &rarr; <strong>Generate</strong><br>
-          4. Copy the 16-character password &rarr; Paste in Render env as <strong>EMAIL_PASS</strong> (no spaces)<br>
-          5. Set <strong>EMAIL_USER</strong> = your full Gmail address (e.g. yourname@gmail.com)
+        <div style="display:flex;gap:8px">
+          <input type="text" id="admin-chat-input" placeholder="Send a message as Admin..." maxlength="300" style="flex:1" onkeydown="if(event.key==='Enter')adminSendChat()">
+          <button class="btn btn-gold" onclick="adminSendChat()"><i class="fas fa-paper-plane"></i> Send</button>
         </div>
       </div>
+
       <div class="form-card" style="max-width:580px">
         <div class="fc-title"><i class="fas fa-paper-plane"></i> Send Push Notification to All Students</div>
         <div class="fg"><label>Title *</label><input type="text" id="ann-title" placeholder="e.g. New test live now!"></div>
@@ -929,29 +926,13 @@ function deleteStudent(id, name){
 
 // DELETE BATCH
 function deleteBatch(batch){
-  var label = {
-    '11':'Class 11',
-    '12':'Class 12',
-    'dropper':'Dropper'
-  }[batch];
-
-  if(!confirm('DELETE ALL ' + label + ' STUDENTS AND THEIR RESULTS?\n\nThis CANNOT be undone.')) return;
-
-  if(!confirm('Are you 100% sure? This removes ALL ' + label + ' data permanently.')) return;
-
-  api('/api/admin/students/batch/' + batch, { method:'DELETE' })
-    .then(function(r){
-      toast(
-        'Deleted ' + r.deletedStudents +
-        ' students and ' + r.deletedResults +
-        ' results',
-        'success'
-      );
-      loadStudents();
-    })
-    .catch(function(e){
-      toast(e.message, 'error');
-    });
+  var label={'11':'Class 11','12':'Class 12','dropper':'Dropper'}[batch];
+  if(!confirm('DELETE ALL '+label+' STUDENTS AND RESULTS? Cannot be undone.'))return;
+  if(!confirm('100% sure? ALL '+label+' data will be permanently removed.'))return;
+  api('/api/admin/students/batch/'+batch,{method:'DELETE'}).then(function(r){
+    toast('Deleted '+r.deletedStudents+' students and '+r.deletedResults+' results','success');
+    loadStudents();
+  }).catch(function(e){toast(e.message,'error');});
 }
 
 // DELETE CHEAT LOG
@@ -967,6 +948,36 @@ function clearAllCheatLogs(){
   api('/api/push/cheat-logs',{method:'DELETE'}).then(function(r){
     toast('Cleared '+r.deleted+' logs','success');loadCheatLogs();
   }).catch(function(e){toast(e.message,'error');});
+}
+
+// ADMIN SEND CHAT
+function adminSendChat(){
+  var inp=document.getElementById('admin-chat-input');
+  var text=(inp?inp.value:'').trim();
+  if(!text){toast('Enter a message','error');return;}
+  if(!window.adminSocket){
+    window.adminSocket=io({withCredentials:true,transports:['polling']});
+    window.adminSocket.on('chat-message',function(msg){appendAdminChatMsg(msg);});
+  }
+  window.adminSocket.emit('chat-message',{name:'Admin',batch:'',text:text,isAdmin:true});
+  if(inp)inp.value='';
+}
+function appendAdminChatMsg(msg){
+  var box=document.getElementById('admin-chat-box');if(!box)return;
+  var empty=box.querySelector('p');if(empty&&box.children.length===1)box.innerHTML='';
+  var div=document.createElement('div');
+  div.style.cssText='padding:6px 10px;border-radius:8px;max-width:85%;word-break:break-word;font-size:13px;'+(msg.isAdmin?'background:#fef3c7;border:1px solid #f0c040':'background:#fff;border:1px solid #e2e8f0');
+  div.innerHTML='<strong style="color:#b7791f;font-size:11px">'+(msg.isAdmin?'👑 Admin':esc(msg.name)+' ('+esc(msg.batch)+')')+'</strong> <span style="opacity:0.5;font-size:10px">'+msg.time+'</span><br>'+esc(msg.text);
+  box.appendChild(div);
+  box.scrollTop=box.scrollHeight;
+}
+function initAdminChat(){
+  if(window.adminSocket)return;
+  try{
+    window.adminSocket=io({withCredentials:true,transports:['polling']});
+    window.adminSocket.on('chat-message',function(msg){appendAdminChatMsg(msg);});
+    window.adminSocket.on('connect',function(){console.log('Admin chat connected');});
+  }catch(e){console.error('Admin socket error:',e);}
 }
 
 // ADMIN CHAT MUTE TOGGLE
