@@ -447,7 +447,7 @@ var socket=null;
 
 // UTILS
 function showPage(id){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});var el=document.getElementById(id);if(el)el.classList.add('active');window.scrollTo(0,0);}
-function esc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function esc(s){if(s==null)return'';var d=document.createElement('div');d.textContent=String(s);return d.innerHTML;}
 function gv(id){var el=document.getElementById(id);return el?(el.value||'').trim():'';}
 function setEl(id,v){var el=document.getElementById(id);if(el)el.textContent=v;}
 function togglePw(id,btn){var el=document.getElementById(id);if(!el)return;var showing=(el.type==='text');el.type=showing?'password':'text';var icon=btn.querySelector('i');if(icon)icon.className=showing?'fas fa-eye':'fas fa-eye-slash';}
@@ -929,15 +929,29 @@ function deleteStudent(id, name){
 
 // DELETE BATCH
 function deleteBatch(batch){
-  var label={'11':'Class 11','12':'Class 12','dropper':'Dropper'}[batch];
-  if(!confirm('DELETE ALL '+label+' STUDENTS AND THEIR RESULTS?
+  var label = {
+    '11':'Class 11',
+    '12':'Class 12',
+    'dropper':'Dropper'
+  }[batch];
 
-This CANNOT be undone.'))return;
-  if(!confirm('Are you 100% sure? This removes ALL '+label+' data permanently.'))return;
-  api('/api/admin/students/batch/'+batch,{method:'DELETE'}).then(function(r){
-    toast('Deleted '+r.deletedStudents+' students and '+r.deletedResults+' results','success');
-    loadStudents();
-  }).catch(function(e){toast(e.message,'error');});
+  if(!confirm('DELETE ALL ' + label + ' STUDENTS AND THEIR RESULTS?\n\nThis CANNOT be undone.')) return;
+
+  if(!confirm('Are you 100% sure? This removes ALL ' + label + ' data permanently.')) return;
+
+  api('/api/admin/students/batch/' + batch, { method:'DELETE' })
+    .then(function(r){
+      toast(
+        'Deleted ' + r.deletedStudents +
+        ' students and ' + r.deletedResults +
+        ' results',
+        'success'
+      );
+      loadStudents();
+    })
+    .catch(function(e){
+      toast(e.message, 'error');
+    });
 }
 
 // DELETE CHEAT LOG
