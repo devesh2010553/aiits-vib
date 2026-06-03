@@ -377,6 +377,14 @@ textarea{resize:vertical}
         <h3><i class="fas fa-users" style="color:var(--gold)"></i> Students</h3>
         <span id="students-count" class="count-pill">0</span>
       </div>
+      <div style="background:#fff8f8;border:1.5px solid rgba(197,48,48,0.25);border-radius:10px;padding:12px 14px;margin-bottom:12px">
+        <p style="font-size:11px;font-weight:700;color:#c53030;margin-bottom:6px"><i class="fas fa-trash"></i> Delete Entire Batch (permanent, cannot undo)</p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-red btn-sm" onclick="deleteBatch('11')">Delete Class 11</button>
+          <button class="btn btn-red btn-sm" onclick="deleteBatch('12')">Delete Class 12</button>
+          <button class="btn btn-red btn-sm" onclick="deleteBatch('dropper')">Delete Droppers</button>
+        </div>
+      </div>
       <div class="batch-filter-row">
         <button class="bfbtn active" id="sbf-all" onclick="filterByBatch('')">All</button>
         <button class="bfbtn" id="sbf-11" onclick="filterByBatch('11')">Class 11</button>
@@ -886,14 +894,18 @@ function renderStudents(list){
   var c=document.getElementById('students-table');if(!c)return;
   if(!list.length){c.innerHTML='<p style="text-align:center;color:#888;padding:28px">No students found.</p>';return;}
   var bMap={'11':'Class 11','12':'Class 12','dropper':'Dropper'};
-  var html='<div style="overflow-x:auto"><table class="students-table"><thead><tr><th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Batch</th><th>Coaching</th><th>Tests</th><th>Total Marks</th><th>Joined</th></tr></thead><tbody>';
+  var html='<div style="overflow-x:auto"><table class="students-table"><thead><tr><th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Batch</th><th>Coaching</th><th>Tests</th><th>Total Marks</th><th>Joined</th><th>Actions</th></tr></thead><tbody>';
   list.forEach(function(s,i){
     var bColors={'11':'#dbeafe:#1e40af','12':'#dcfce7:#15803d','dropper':'#fef3c7:#92400e'}[s.batch]||'#f0f0f0:#555';
     var bc=bColors.split(':');
     html+='<tr><td>'+(i+1)+'</td><td><strong>'+esc(s.name)+'</strong></td><td style="font-size:11px">'+esc(s.email)+'</td><td>'+esc(s.phone||'-')+'</td>';
     html+='<td><span style="padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;background:'+bc[0]+';color:'+bc[1]+'">'+esc(bMap[s.batch]||s.batch||'-')+'</span></td>';
     html+='<td>'+esc(s.coachingName||'-')+'</td><td>'+(s.totalTests||0)+'</td><td style="font-family:monospace;color:#b8860b">'+(s.totalMarks||0)+'</td>';
-    html+='<td style="font-size:11px">'+new Date(s.createdAt).toLocaleDateString('en-IN')+'</td></tr>';
+    html+='<td style="font-size:11px">'+new Date(s.createdAt).toLocaleDateString('en-IN')+'</td>';
+    html+='<td style="white-space:nowrap">';
+    html+='<button class="btn btn-red btn-sm" style="margin-right:4px" onclick="deleteStudent(\''+s._id+'\',\''+esc(s.name)+'\')" title="Delete"><i class="fas fa-trash"></i></button>';
+    html+='<button class="btn btn-outline btn-sm" onclick="toggleMuteStudent(\''+esc(s.name)+'\',\''+s._id+'\')" id="mute-btn-'+s._id+'" title="Mute in chat"><i class="fas fa-microphone-slash"></i></button>';
+    html+='</td></tr>';
   });
   html+='</tbody></table></div>';
   c.innerHTML=html;
@@ -913,6 +925,25 @@ function loadCheatLogs(){
     });
     c.innerHTML=html;
   }).catch(function(err){c.innerHTML='<p style="color:#c53030">'+esc(err.message)+'</p>';});
+}
+
+// MUTE STUDENT IN CHAT
+var mutedStudents={};
+function toggleMuteStudent(name, id){
+  var isMuted=!!mutedStudents[id];
+  mutedStudents[id]=!isMuted;
+  var newState=mutedStudents[id];
+  // Broadcast to all clients via socket
+  if(window.adminSocket){
+    window.adminSocket.emit('admin-block-student',{name:name,uid:id,blocked:newState});
+  }
+  var btn=document.getElementById('mute-btn-'+id);
+  if(btn){
+    btn.style.background=newState?'#c53030':'';
+    btn.style.color=newState?'#fff':'';
+    btn.title=newState?'Unmute student':'Mute in chat';
+  }
+  toast(newState?name+' muted in chat':name+' unmuted','success');
 }
 
 // DELETE STUDENT

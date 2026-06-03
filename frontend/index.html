@@ -880,7 +880,20 @@ window.addEventListener('load',function(){
   checkAuth();
   var resumeId=new URLSearchParams(window.location.search).get('resume');
   if(resumeId)window._pendingResume=resumeId;
-  setTimeout(function(){try{if(typeof io!=='undefined'){socket=io({withCredentials:true,transports:['polling']});window.socket=socket;}}catch(e){}},1500);
+  setTimeout(function(){
+  try{
+    if(typeof io!=='undefined'){
+      socket=io({withCredentials:true,transports:['polling']});
+      window.socket=socket;
+      socket.on('connect',function(){
+        // Fetch server-side mute truth on (re)connect
+        fetch('/api/chat/status').then(function(r){return r.json();}).then(function(d){
+          applyChatMuteUI(d.muted);
+        }).catch(function(){});
+      });
+    }
+  }catch(e){}
+},1500);
   if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(function(){});
 });
 
@@ -1629,192 +1642,130 @@ function loadNewLeaderboard(batch){
 }
 
 // ── Chat ─────────────────────────────────────────────────────────────────────
-var chatMutedLocal = false;
-var chatInitDone = false;
-var CHAT_KEY = 'aiits_chat_v1';
-var CHAT_TTL = 24 * 60 * 60 * 1000; // 24 hours
+var chatMutedLocal=false;
+var chatInitDone=false;
+var CHAT_KEY='aiits_chat_v1';
+var CHAT_MUTE_KEY='aiits_chat_muted';
+var CHAT_BLOCKED_KEY='aiits_chat_blocked';
+var CHAT_TTL=24*60*60*1000; // 24 hours
 
 function saveChatToStorage(msgs){
-  try{
-    localStorage.setItem(
-      CHAT_KEY,
-      JSON.stringify({
-        ts: Date.now(),
-        msgs: msgs.slice(-200)
-      })
-    );
-  }catch(e){}
+  try{localStorage.setItem(CHAT_KEY,JSON.stringify({ts:Date.now(),msgs:msgs.slice(-200)}));}catch(e){}
 }
-
 function loadChatFromStorage(){
   try{
-    var raw = localStorage.getItem(CHAT_KEY);
-    if(!raw) return [];
-
-    var data = JSON.parse(raw);
-
-    if(Date.now() - data.ts > CHAT_TTL){
-      localStorage.removeItem(CHAT_KEY);
-      return [];
-    }
-
-    return data.msgs || [];
-  }catch(e){
-    return [];
-  }
+    var raw=localStorage.getItem(CHAT_KEY);
+    if(!raw)return[];
+    var data=JSON.parse(raw);
+    if(Date.now()-data.ts>CHAT_TTL){localStorage.removeItem(CHAT_KEY);return[];}
+    return data.msgs||[];
+  }catch(e){return[];}
 }
-
-var chatMessages = loadChatFromStorage();
+// Persist mute state so page refresh doesn't reset it
+function saveMuteState(muted){
+  try{localStorage.setItem(CHAT_MUTE_KEY,muted?'1':'0');}catch(e){}
+}
+function loadMuteState(){
+  try{return localStorage.getItem(CHAT_MUTE_KEY)==='1';}catch(e){return false;}
+}
+// Persist blocked students list
+function loadBlockedList(){
+  try{return JSON.parse(localStorage.getItem(CHAT_BLOCKED_KEY)||'[]');}catch(e){return[];}
+}
+var chatMessages=loadChatFromStorage();
+// Restore mute state immediately on load
+chatMutedLocal=loadMuteState();
 
 function showChatUnreadDot(show){
-  var dots = document.querySelectorAll('.chat-unread-dot');
-
-  dots.forEach(function(d){
-    d.style.display = show ? 'block' : 'none';
-  });
+  var dots=document.querySelectorAll('.chat-unread-dot');
+  dots.forEach(function(d){d.style.display=show?'block':'none';});
 }
 
+function applyChatMuteUI(muted){
+  chatMutedLocal=muted;
+  saveMuteState(muted);
+  var badge=document.getElementById('chat-mute-badge');
+  var inp=document.getElementById('chat-input');
+  var btn=document.getElementById('chat-send-btn');
+  if(badge)badge.classList.toggle('hidden',!muted);
+  if(inp){inp.disabled=muted;inp.placeholder=muted?'Chat muted by admin':'Type a message...';}
+  if(btn)btn.disabled=muted;
+}
 function initChat(){
-  if(!window.socket) return;
-  if(chatInitDone) return;
-
-  chatInitDone = true;
+  if(!window.socket)return;
+  // Apply persisted mute state immediately (before socket connects)
+  applyChatMuteUI(chatMutedLocal);
 
   // Render cached messages
-  var box = document.getElementById('chat-box');
-
+  var box=document.getElementById('chat-box');
   if(box){
-    box.innerHTML = '';
-
-    if(chatMessages.length === 0){
-      box.innerHTML =
-        '<p style="text-align:center;color:var(--text-muted);font-size:12px;margin:auto">No messages yet. Say hello!</p>';
-    }else{
-      chatMessages.forEach(function(m){
-        appendChatMsg(m, true);
-      });
+    box.innerHTML='';
+    if(chatMessages.length===0){
+      box.innerHTML='<p style="text-align:center;color:var(--text-muted);font-size:12px;margin:auto">No messages yet. Say hello!</p>';
+    } else {
+      chatMessages.forEach(function(m){appendChatMsg(m,true);});
     }
   }
 
-  window.socket.on('chat-message', function(msg){
+  if(chatInitDone)return; // Don't re-register socket events
+  chatInitDone=true;
+
+  window.socket.on('chat-message',function(msg){
+    // Check if this student is blocked - don't show their messages
+    var blocked=loadBlockedList();
+    if(blocked.indexOf(msg.name)!==-1&&!msg.isAdmin)return;
     chatMessages.push(msg);
     saveChatToStorage(chatMessages);
-    appendChatMsg(msg, false);
-
-    // Show unread dot if user is not on chat tab
-    var chatTab = document.getElementById('dash-tab-chat');
-
-    if(!chatTab || !chatTab.classList.contains('active')){
+    appendChatMsg(msg,false);
+    var chatTab=document.getElementById('dash-tab-chat');
+    if(!chatTab||!chatTab.classList.contains('active')){
       showChatUnreadDot(true);
     }
   });
 
-  window.socket.on('chat-mute-changed', function(d){
-    chatMutedLocal = d.muted;
+  window.socket.on('chat-mute-changed',function(d){
+    applyChatMuteUI(d.muted);
+  });
 
-    var badge = document.getElementById('chat-mute-badge');
-    var inp = document.getElementById('chat-input');
-    var btn = document.getElementById('chat-send-btn');
-
-    if(badge) badge.classList.toggle('hidden', !d.muted);
-    if(inp) inp.disabled = d.muted;
-    if(btn) btn.disabled = d.muted;
-
-    if(d.muted){
-      if(inp) inp.placeholder = 'Chat muted by admin';
-    }else{
-      if(inp) inp.placeholder = 'Type a message...';
-    }
+  window.socket.on('student-blocked',function(d){
+    // Admin blocked a student - update local blocked list
+    var blocked=loadBlockedList();
+    if(d.blocked&&blocked.indexOf(d.name)===-1)blocked.push(d.name);
+    else if(!d.blocked)blocked=blocked.filter(function(n){return n!==d.name;});
+    try{localStorage.setItem(CHAT_BLOCKED_KEY,JSON.stringify(blocked));}catch(e){}
   });
 }
 
-function appendChatMsg(msg, skipScroll){
-  var box = document.getElementById('chat-box');
-  if(!box) return;
-
+function appendChatMsg(msg,skipScroll){
+  var box=document.getElementById('chat-box');if(!box)return;
   // Remove empty-state placeholder
-  var empty = box.querySelector('p');
-
-  if(empty && box.children.length === 1){
-    box.innerHTML = '';
-  }
-
-  var div = document.createElement('div');
-
-  var isMe =
-    S.user &&
-    msg.name === S.user.name &&
-    !msg.isAdmin;
-
-  div.style.cssText =
-    'padding:7px 11px;border-radius:10px;max-width:82%;word-break:break-word;font-size:13px;line-height:1.4;' +
-    (
-      msg.isAdmin
-        ? 'background:#fef3c7;border:1px solid #f0c040;align-self:flex-start'
-        : (
-            isMe
-              ? 'background:#e8f5e9;border:1px solid #a5d6a7;align-self:flex-end'
-              : 'background:#fff;border:1px solid var(--border);align-self:flex-start'
-          )
-    );
-
-  div.innerHTML =
-    '<span style="font-weight:700;color:var(--gold);font-size:11px">' +
-    (
-      msg.isAdmin
-        ? '👑 Admin'
-        : (
-            isMe
-              ? 'You'
-              : esc(msg.name) +
-                ' <span style="opacity:0.6;font-weight:400">(' +
-                esc(msg.batch) +
-                ')</span>'
-          )
-    ) +
-    '</span> <span style="opacity:0.5;font-size:10px">' +
-    msg.time +
-    '</span><br>' +
-    esc(msg.text);
-
+  var empty=box.querySelector('p');if(empty&&box.children.length===1)box.innerHTML='';
+  var div=document.createElement('div');
+  var isMe=S.user&&msg.name===S.user.name&&!msg.isAdmin;
+  div.style.cssText='padding:7px 11px;border-radius:10px;max-width:82%;word-break:break-word;font-size:13px;line-height:1.4;'+(msg.isAdmin?'background:#fef3c7;border:1px solid #f0c040;align-self:flex-start':(isMe?'background:#e8f5e9;border:1px solid #a5d6a7;align-self:flex-end':'background:#fff;border:1px solid var(--border);align-self:flex-start'));
+  div.innerHTML='<span style="font-weight:700;color:var(--gold);font-size:11px">'+(msg.isAdmin?'👑 Admin':(isMe?'You':esc(msg.name)+' <span style="opacity:0.6;font-weight:400">('+esc(msg.batch)+')</span>'))+'</span> <span style="opacity:0.5;font-size:10px">'+msg.time+'</span><br>'+esc(msg.text);
   box.appendChild(div);
-
-  if(!skipScroll){
-    box.scrollTop = box.scrollHeight;
-  }else{
-    setTimeout(function(){
-      box.scrollTop = box.scrollHeight;
-    }, 50);
-  }
+  if(!skipScroll)box.scrollTop=box.scrollHeight;
+  else setTimeout(function(){box.scrollTop=box.scrollHeight;},50);
 }
 
 function sendChatMsg(){
-  if(chatMutedLocal){
-    toast('Chat is muted by admin', 'error');
-    return;
-  }
-
-  var inp = document.getElementById('chat-input');
-  var text = (inp ? inp.value : '').trim();
-
-  if(!text) return;
-
-  if(!window.socket){
-    toast('Not connected', 'error');
-    return;
-  }
-
-  window.socket.emit('chat-message', {
-    name: S.user ? S.user.name : 'Student',
-    batch: S.user ? S.user.batch : '',
-    text: text,
-    isAdmin: false
+  if(chatMutedLocal){toast('Chat is muted by admin','error');return;}
+  var inp=document.getElementById('chat-input');
+  var text=(inp?inp.value:'').trim();
+  if(!text)return;
+  if(!window.socket){toast('Not connected','error');return;}
+  var myName=S.user?S.user.name:'Student';
+  window.socket.emit('chat-message',{
+    name:myName,
+    uid:S.user?String(S.user.id):'',
+    batch:S.user?S.user.batch:'',
+    text:text,
+    isAdmin:false
   });
-
-  if(inp){
-    inp.value = '';
-  }
+  if(inp)inp.value='';
 }
+
 // ── Notifications ─────────────────────────────────────────────────────────────
 function requestNotificationPermission(){
   var btn=document.getElementById('notif-btn');

@@ -105,8 +105,12 @@ app.get('*', async (req,res) => {
   res.send(html);
 });
 
-// In-memory chat state
-let chatMuted = false;
+// In-memory chat state (persists until server restart)
+let chatMuted   = false;
+const blockedUids = new Set(); // blocked student UIDs
+
+app.set('io', io);
+app.set('chatMuted', false);
 
 io.on('connection', socket => {
   // Send current mute state on connect
@@ -115,44 +119,57 @@ io.on('connection', socket => {
   socket.on('leave-test', id => socket.leave('test-'+id));
   socket.on('join-admin', ()  => socket.join('admin-room'));
 
+  // Verify admin from socket cookie
+  function isAdminSocket() {
+    try {
+      const cookies = socket.handshake.headers.cookie || '';
+      const match = cookies.match(/adminToken=([^;]+)/);
+      if (!match) return false;
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.verify(match[1], process.env.JWT_SECRET);
+      return decoded.role === 'admin';
+    } catch(e) { return false; }
+  }
+
   // Public chat
   socket.on('chat-message', (data) => {
-    // Verify isAdmin claim by checking if socket has admin cookie
-    let isAdmin = false;
-    if (data.isAdmin) {
-      try {
-        const cookies = socket.handshake.headers.cookie || '';
-        const match = cookies.match(/adminToken=([^;]+)/);
-        if (match) {
-          const jwt = require('jsonwebtoken');
-          const decoded = jwt.verify(match[1], process.env.JWT_SECRET);
-          isAdmin = decoded.role === 'admin';
-        }
-      } catch(e) { isAdmin = false; }
-    }
-    if (chatMuted && !isAdmin) return;
+    const adminSender = data.isAdmin && isAdminSocket();
+    // Block if: global mute (non-admin) OR sender is individually blocked
+    if (chatMuted && !adminSender) return;
+    const uid = (data.uid || '').slice(0, 64);
+    if (blockedUids.has(uid) && !adminSender) return;
     const msg = {
       id:      Date.now() + Math.random().toString(36).slice(2),
-      name:    isAdmin ? 'Admin' : (data.name || 'Student').slice(0, 40),
-      batch:   isAdmin ? '' : (data.batch || '').slice(0, 20),
+      name:    adminSender ? 'Admin' : (data.name || 'Student').slice(0, 40),
+      uid:     adminSender ? '' : uid,
+      batch:   adminSender ? '' : (data.batch || '').slice(0, 20),
       text:    (data.text || '').slice(0, 300),
-      isAdmin: isAdmin,
+      isAdmin: adminSender,
       time:    new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' }),
     };
     io.emit('chat-message', msg);
   });
 
-  socket.on('admin-toggle-mute', (data) => {
-    try {
-      const cookies = socket.handshake.headers.cookie || '';
-      const match = cookies.match(/adminToken=([^;]+)/);
-      if (!match) return;
-      const jwt = require('jsonwebtoken');
-      const decoded = jwt.verify(match[1], process.env.JWT_SECRET);
-      if (decoded.role !== 'admin') return;
-      chatMuted = !chatMuted;
-      io.emit('chat-mute-changed', { muted: chatMuted });
-    } catch(e) {}
+  // Admin mute/unmute all (also broadcast so clients persist it)
+  socket.on('admin-toggle-mute', () => {
+    if (!isAdminSocket()) return;
+    chatMuted = !chatMuted;
+    app.set('chatMuted', chatMuted);
+    io.emit('chat-mute-changed', { muted: chatMuted });
+  });
+
+  // Admin block/unblock individual student
+  socket.on('admin-block-student', (data) => {
+    if (!isAdminSocket()) return;
+    const uid = (data.uid || '').slice(0, 64);
+    const name = (data.name || '').slice(0, 40);
+    if (data.blocked) {
+      blockedUids.add(uid);
+    } else {
+      blockedUids.delete(uid);
+    }
+    // Notify all clients to hide/show this student messages
+    io.emit('student-blocked', { uid, name, blocked: !!data.blocked });
   });
 });
 
